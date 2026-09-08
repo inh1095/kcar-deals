@@ -165,8 +165,11 @@ def main() -> None:
         ("면책 문구", "상업적 이용 금지" in gbody, "-"),
         ("미수집 필드 한계 명시", "보험 수리 이력" in gbody, "-"),
         ("리콜 조회 안내", "car.go.kr" in gbody, "-"),
-        ("점수 미표시(숫자 줄세우기 없음)", "점수" not in gbody.split("<footer>")[0]
-         or "점수로 줄 세우지" in gbody, "-"),
+        # 불투명한 종합점수로 줄 세우지 않는다는 것을 본문에서 밝히고 있는지 확인.
+        # (순위는 '10년 총지출'과 '만족 요소 개수'처럼 뜻이 분명한 숫자만 쓴다)
+        ("점수로 줄 세우지 않음을 명시",
+         ("점수가 아니라" in gbody) or ("점수로 줄 세우지" in gbody), "-"),
+        ("순위 기준을 숫자로 공개", "10년 총지출" in gbody and "만족 요소" in gbody, "-"),
     ]
     for label, passed, detail in guide_rules:
         ok &= passed
@@ -176,10 +179,20 @@ def main() -> None:
         passed = tag in gbody
         ok &= passed
         print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
-    cmp_rows = sum(n for tid, n in gscan.rows.items() if tid.startswith("cmp"))
-    passed = cmp_rows == len(rows)
+    # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
+    t3 = gscan.rows.get("tbl3", -1)
+    passed = t3 == len(rows)
     ok &= passed
-    print(f"  {'OK  ' if passed else 'DIFF'} 전체 비교표 행 수: 가이드={cmp_rows} / CSV={len(rows)}")
+    print(f"  {'OK  ' if passed else 'DIFF'} 전체 탭 표(tbl3) 행 수: 가이드={t3} / CSV={len(rows)}")
+    for tid in ("tbl1", "tbl2"):
+        n = gscan.rows.get(tid, -1)
+        sub_ok = 0 < n <= len(rows)
+        ok &= sub_ok
+        print(f"  {'OK  ' if sub_ok else 'FAIL'} {tid} 행 수 {n} (0 < n <= {len(rows)})")
+    for need in ("찐가성비", "가심비", 'id="t1"', 'id="t2"', 'id="t3"', 'class="panel"'):
+        p_ok = need in gbody
+        ok &= p_ok
+        print(f"  {'OK  ' if p_ok else 'FAIL'} 탭 구성 '{need}' 존재")
     print(f"       참고: 가이드 내 표 {dict(gscan.rows)}")
 
     print()
