@@ -243,7 +243,15 @@ FUEL_ECONOMY = {
     "smartstream_16": 15.0, "smartstream_20": 13.0,
     "nu_20": 11.8, "nu_20_lpi": 8.8,
     "theta2_24_gdi": 10.8, "theta2_20_t": 10.5, "lambda_30_33": 9.5,
+    # 2020년 이후 스마트스트림·람다 계열 (신형 후보에서 쓰인다)
+    "smartstream_25": 11.0, "smartstream_20_t": 10.5,
+    "lambda_35": 9.2, "lambda_33_t": 8.5,
 }
+
+
+def missing_fuel_economy() -> list[str]:
+    """연비 표에 빠진 엔진이 있으면 알려 준다(기름값이 0으로 계산되는 사고 방지)."""
+    return [k for k in ENGINES if k not in FUEL_ECONOMY]
 
 
 def annual_fuel_cost(engine_key: str, fuel: str, annual_km: int = ANNUAL_KM) -> int | None:
@@ -425,3 +433,39 @@ def age_notes(year: int, this_year: int = 2026) -> list[str]:
                    "(보통 5년/10만km)은 이미 끝났을 가능성이 높습니다. "
                    "K카 자체 보증이 어디까지 되는지 확인하세요.")
     return out
+
+
+# ── 감가 (CALC) ──────────────────────────────────────────────────────────────
+# K카 직영 재고 6,842대에서 같은 세대의 인접 연식 중앙값 차이로 관측한 '1년치 감가율'.
+# 차령이 늘면 감가액이 줄어드는 것은 사실이지만, 비율로는 4~9년차에 6% 안팎으로
+# 크게 줄지 않는다.
+AGE_DEPRECIATION_RATE = {1: .009, 2: .042, 3: .081, 4: .060, 5: .061, 6: .058,
+                         7: .064, 8: .040, 9: .072, 10: .031, 11: .011, 12: .074}
+DEFAULT_DEP_RATE = 0.05
+
+
+def forward_depreciation(price: int, year: int, gen_stats: dict | None = None,
+                         years: int = 3, this_year: int = 2026) -> tuple[int, str]:
+    """앞으로 `years`년 더 타면 얼마 떨어질지 추정(만원).
+
+    1순위: 같은 세대의 `years`년 더 오래된 연식 중앙값과의 실제 차이.
+    2순위: 관측된 차령별 감가율 누적.
+    반환: (감가액, 근거 설명)
+    """
+    if gen_stats:
+        ys = {int(y): p for y, p in (gen_stats.get("median_price_by_year") or {}).items()}
+        cn = {int(y): c for y, c in (gen_stats.get("year_counts") or {}).items()}
+        if year in ys and (year - years) in ys and cn.get(year, 0) >= 3 \
+                and cn.get(year - years, 0) >= 3:
+            measured = round(ys[year] - ys[year - years])
+            # 세대 출시 연도 경계에서는 왜곡이 생긴다. 예를 들어 2019년 11월에 나온
+            # 세대의 2022년식을 2019년식과 비교하면, 2019년식이 사실상 2020년 초 차라
+            # 3년치 감가가 거의 0으로 잡힌다. 관측된 연 4~9% 감가와 모순되는 값
+            # (3년에 8% 미만)은 신뢰하지 않고 차령별 평균으로 되돌린다.
+            if measured >= price * 0.08:
+                return max(0, measured), "같은 세대 실제 시세 차이"
+    age = this_year - year
+    keep = 1.0
+    for a in range(age, age + years):
+        keep *= (1 - AGE_DEPRECIATION_RATE.get(a, DEFAULT_DEP_RATE))
+    return max(0, round(price * (1 - keep))), "차령별 평균 감가율 적용"

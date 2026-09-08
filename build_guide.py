@@ -248,9 +248,22 @@ def evaluate(r: dict, stats: dict) -> dict:
     if size in (K.SIZE_SMALL_SUV, K.SIZE_MID_SUV):
         good.append("시트가 적당히 높아 타고 내리기 편합니다")
 
-    # 10) 세금·연료비 -------------------------------------------------------
+    # 10) 세금·연료비·감가 → 연간 총 소유비용 -------------------------------
     tax = K.car_tax(r["cc"], r["year"])
     fuel_cost = K.annual_fuel_cost(pt["engine"], r["fuel"])
+    gen_stats = (stats.get("generations") or {}).get(r["model"] or "")
+    dep3, dep_basis = K.forward_depreciation(r["price"], r["year"], gen_stats)
+    # 연간 총 소유비용(원) = 3년 감가/3 + 자동차세 + 기름값
+    annual_cost = int(dep3 / 3 * 10000 + (tax or 0) + (fuel_cost or 0))
+    dep_ratio = dep3 / r["price"] if r["price"] else 0
+    if dep_ratio <= 0.13:
+        good.append(f"3년 더 타고 팔 때 값이 {dep3:,}만원(차값의 {dep_ratio:.0%})만 떨어질 "
+                    f"전망입니다 — 감가 손해가 적은 편입니다")
+    elif dep_ratio >= 0.22:
+        caution.append(f"3년 뒤 값이 {dep3:,}만원(차값의 {dep_ratio:.0%}) 떨어질 전망입니다")
+        checks.append(f"이 차는 앞으로 3년에 <b>{dep3:,}만원</b>이 더 떨어질 것으로 보입니다"
+                      f"({dep_basis}). 이미 많이 떨어진 차라도 감가가 멈추지는 않습니다. "
+                      f"차값이 싸 보여도 <b>3년 뒤 되팔 때 손해</b>를 함께 계산하세요.")
     if r["cc"] and r["cc"] >= 2300:
         caution.append("배기량이 커서 자동차세와 기름값이 많이 듭니다")
 
@@ -281,7 +294,8 @@ def evaluate(r: dict, stats: dict) -> dict:
                 warn=warn, caution=caution, good=good,
                 checks=[c for c in checks if c], grade=grade,
                 tax=tax, fuel_cost=fuel_cost, stock=cnt, rank=rank, gen=gen,
-                order=order)
+                dep3=dep3, dep_basis=dep_basis, dep_ratio=dep_ratio,
+                annual_cost=annual_cost, order=order)
 
 
 # ── 추천 고르기 ──────────────────────────────────────────────────────────────
@@ -342,6 +356,11 @@ def categories(items):
          "주차는 조금 더 신경 쓰셔야 합니다.",
          pick(items, lambda i: i["ev"]["size"] in (K.SIZE_MID_SUV, K.SIZE_LARGE_SUV),
               exclude=top)),
+        ("3년 타고 팔 때 손해가 가장 적은 차",
+         "중고차에서 가장 큰 돈은 수리비가 아니라 <b>감가(값이 떨어지는 것)</b>입니다. "
+         "여기 있는 차들은 차값·세금·기름값·3년 감가를 다 합친 <b>연간 총 소유비용</b>이 "
+         "가장 낮습니다. 차값만 싼 차보다 이쪽이 실제로 돈이 덜 듭니다.",
+         pick(sorted(items, key=lambda i: i["ev"]["annual_cost"]), lambda i: True)),
         ("돈을 가장 아끼는 차",
          "차값이 낮고 세금·기름값도 적게 드는 차입니다. 대신 <b>안전장치가 위 차들보다 "
          "적습니다.</b> 값과 안전을 맞바꾸는 선택이니, 위 '안전장치가 가장 많은 차'와 "
@@ -604,6 +623,11 @@ def card(r: dict, rank: int | None = None) -> str:
                      f'<strong>{ev["fuel_cost"]:,}원</strong></div>')
     money.append(f'<div><span>차값 + 이전비 추정</span>'
                  f'<strong>{r["total_cost_est"]:,}만원</strong></div>')
+    money.append(f'<div><span>3년 뒤 예상 감가</span>'
+                 f'<strong>-{ev["dep3"]:,}만원</strong></div>')
+    money.append(f'<div style="background:#eef4f0;border-color:#bcdcc7">'
+                 f'<span>연간 총 소유비용(감가+세금+기름)</span>'
+                 f'<strong>{ev["annual_cost"]//10000:,}만원</strong></div>')
     pros = "".join(f"<li>{rich(g)}</li>" for g in ev["good"][:8])
     cons = "".join(f"<li>{rich(c)}</li>" for c in ev["warn"] + ev["caution"])
     checks = "".join(f"<li>{rich(c)}</li>" for c in ev["checks"])
@@ -714,6 +738,7 @@ def build(rows, meta, stats) -> str:
         f"<p style='font-size:.88rem;color:#666'>이 정리에서의 상태: <b>{h(st)}</b><br>"
         f"<a href='{h(u)}' target='_blank' rel='noopener nofollow'>{h(u)}</a></p>"
         for n, u, d, st, used in CHANNELS)
+    pool = meta.get("comparable_pool", 0)
     n_adas4 = sum(1 for i in items if (i["adas_n"] or 0) >= 4)
     n_bag4 = sum(1 for i in items if (i["airbags"] or 0) >= 4)
     return f"""<!doctype html>
@@ -794,6 +819,79 @@ def build(rows, meta, stats) -> str:
 매물 데이터의 자동 조회를 금지하고 있어 수집하지 않았고, 현대 인증중고차는 규칙상
 허용되지만 사이트가 자동 조회를 거부해 받지 못했습니다. 두 곳은 위 링크로
 직접 보시는 것이 맞습니다.</p>
+</div>
+
+<h2>비싼 차가 많이 떨어진 것을 사는 게 이득일까</h2>
+<p class="lead">"원래 비싼 차가 많이 떨어졌으면 더 떨어질 게 없으니 이득"이라는 생각은
+절반만 맞습니다. K카 직영 재고 {pool:,}대에서 같은 세대의 인접 연식 시세를 비교해
+실제 감가를 계산해 봤습니다.</p>
+
+<div class="box">
+<h3 style="margin-top:0">맞는 부분 — 차령이 오래되면 감가액은 확실히 줄어듭니다</h3>
+<table class="simple" id="t-dep"><thead><tr><th>차령</th>
+<th class="num">1년치 감가액(중앙값)</th><th class="num">감가율</th></tr></thead><tbody>
+<tr><td>3년</td><td class="num">218만원</td><td class="num">8.1%</td></tr>
+<tr><td>4년</td><td class="num">120만원</td><td class="num">6.0%</td></tr>
+<tr><td>6년</td><td class="num">78만원</td><td class="num">5.8%</td></tr>
+<tr><td>8년</td><td class="num">42만원</td><td class="num">4.0%</td></tr>
+<tr><td>10년</td><td class="num">40만원</td><td class="num">3.1%</td></tr>
+</tbody></table>
+<p>3년 된 차는 1년에 218만원씩 떨어지는데, 10년 된 차는 40만원만 떨어집니다.
+<b>가장 비싼 구간(첫 3년)을 남이 부담한 차를 사는 것은 분명히 유리합니다.</b></p>
+</div>
+
+<div class="box warnbox">
+<h3 style="margin-top:0">틀린 부분 — '원래 비싼 차'라고 감가가 멈추지는 않습니다</h3>
+<p>같은 재고를 <b>지금 시세대별로</b> 나눠 보면 이야기가 달라집니다.
+차령 3~6년 구간의 1년치 감가입니다.</p>
+<table class="simple"><thead><tr><th>지금 시세</th>
+<th class="num">1년치 감가액</th><th class="num">감가율</th></tr></thead><tbody>
+<tr><td>1,500만원 미만</td><td class="num">90만원</td><td class="num">7.2%</td></tr>
+<tr><td><b>1,500~2,500만원</b></td><td class="num"><b>80만원</b></td>
+<td class="num"><b>4.4%</b></td></tr>
+<tr><td>2,500~4,000만원</td><td class="num">250만원</td><td class="num">9.0%</td></tr>
+<tr><td>4,000만원 이상</td><td class="num">450만원</td><td class="num">10.3%</td></tr>
+</tbody></table>
+<p>원래 비싼 차는 <b>이미 많이 떨어진 뒤에도 계속 큰 금액으로 떨어집니다.</b>
+실제 예를 들면, 제네시스 G80은 신차 5천만원대에서 1,900만원대까지 내려왔는데도
+<b>앞으로 3년에 또 540만원(28%)</b>이 떨어질 전망입니다.
+같은 값대의 아반떼·K3는 3년에 260만원 정도(17%)입니다.</p>
+<p><b>그리고 더 큰 함정은 유지비입니다.</b> 원래 비싼 차는 부품·타이어·브레이크가
+그 등급 기준이고, 배기량이 커서 세금과 기름값이 계속 나갑니다.
+<b>싸게 샀지만 비싸게 유지하게 됩니다.</b></p>
+<p>이 페이지 후보들의 실제 계산 결과입니다. <b>차값 순서와 소유비용 순서가 다릅니다.</b></p>
+<table class="simple"><thead><tr><th>차종</th><th class="num">차값(중앙값)</th>
+<th class="num">연간 총 소유비용</th></tr></thead><tbody>
+<tr><td>제네시스 G80 3.3</td><td class="num">1,920만원</td>
+<td class="num"><b style="color:#932018">468만원</b></td></tr>
+<tr><td>기아 K8</td><td class="num">2,115만원</td><td class="num">359만원</td></tr>
+<tr><td>현대 더 뉴 그랜저</td><td class="num">2,055만원</td><td class="num">348만원</td></tr>
+<tr><td>제네시스 G70</td><td class="num">1,990만원</td><td class="num">315만원</td></tr>
+<tr><td>현대 쏘나타 DN8</td><td class="num">1,840만원</td><td class="num">299만원</td></tr>
+<tr><td>기아 더 뉴 K3</td><td class="num">1,520만원</td><td class="num">248만원</td></tr>
+<tr><td>현대 아반떼 (CN7)</td><td class="num">1,550만원</td>
+<td class="num"><b style="color:#1c5c38">245만원</b></td></tr>
+</tbody></table>
+<p><b>G80은 아반떼보다 차값이 370만원 비싼데, 1년 소유비용은 223만원이 더 듭니다.
+3년이면 670만원 차이입니다.</b> "비싼 차를 싸게 샀다"고 생각한 금액이
+유지비와 추가 감가로 다시 빠져나갑니다.</p>
+</div>
+
+<div class="box tipbox">
+<h3 style="margin-top:0">그럼 '중고방어 잘하는 차'는 아까운 걸까</h3>
+<p>값이 잘 안 떨어지는 차는 <b>살 때 비싸지만 팔 때도 잘 받습니다.</b>
+그래서 실제로 내가 부담하는 감가 손해는 오히려 적습니다.
+신차값과 비슷해 보여 아까운 느낌이 들 뿐, 손해는 아닙니다.</p>
+<p><b>결론 — 봐야 할 숫자는 차값이 아니라 이것입니다.</b></p>
+<p style="text-align:center;font-size:1.05rem;background:#fff;padding:12px;border-radius:8px">
+<b>연간 총 소유비용 = 3년 감가 ÷ 3 + 자동차세 + 기름값</b></p>
+<p>이 페이지의 <b>모든 차 카드에 이 금액을 계산해 넣었습니다.</b>
+차값이 싸도 이 금액이 크면 실제로는 비싼 차입니다.
+아래 <b>"3년 타고 팔 때 손해가 가장 적은 차"</b>가 이 기준으로 고른 목록입니다.</p>
+<p style="font-size:.88rem;color:#555">계산 방법: 3년 감가는 같은 세대의 3년 더 오래된
+연식과 실제 시세 차이를 쓰고, 그 데이터가 부족하면 위 차령별 감가율을 적용했습니다.
+주행거리·트림이 섞여 있어 정확한 예측이 아니라 <b>비교용 추정</b>입니다.
+보험료와 수리비는 사람·차마다 달라 넣지 않았습니다.</p>
 </div>
 
 <h2>먼저, 어머님께 맞는 연료부터 고르세요</h2>
