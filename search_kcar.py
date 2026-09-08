@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""K카(kcar.com) 직영 중고차 매물 수집 + 시세 비교 + 꿀매물 점수 계산.
+"""K카(kcar.com) 직영 중고차 **전체 재고**를 수집해 시세를 만들고, 조건에 맞는 후보를 고른다.
 
 LLM 없이 단독 실행된다.
 
-    python3.11 search_kcar.py --budget 1300 --year 2017 --km 120000 \
+    python3.11 search_kcar.py --budget 1300 --year 2017 --km 120000 --seats 5 \
         --fuel gasoline,hybrid,lpg,diesel --out data/listings.csv
+
+왜 전체 재고를 받는가
+    예산 이하 매물만 받아 중앙값을 내면 "예산 이하 차들끼리의 중앙값"이 되어 시세가
+    실제보다 낮게 잡힌다. 같은 차·같은 연식의 **전체 시세**와 비교해야 싸게 사는지
+    알 수 있으므로, 직영 재고 전체를 받아 시세 기준으로 쓰고 조건 필터는 그 다음에 건다.
 
 준수 사항 (어기지 않는다)
 - robots.txt 허용 범위만 조회한다. 상세 페이지(/bc/detail/carInfoDtl?, /car/info/)는
@@ -24,7 +29,6 @@ import re
 import statistics
 import sys
 import time
-import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 # ── 점수 가중치 (여기만 고치면 된다) ────────────────────────────────────────
@@ -40,9 +44,7 @@ PRICE_GAP_FULL = 0.20     # 그룹 중앙값보다 20% 저렴하면 가격 항�
 KM_GAP_FULL = 0.30        # 그룹 중앙값보다 30% 덜 탔으면 주행거리 항목 만점
 SCORE_OPTIONS = ["후방카메라", "열선시트", "스마트키", "내비"]
 MIN_GROUP_SIZE = 3        # 그룹 매물 수가 이보다 적으면 시세 비교 불가
-TRIM_SPLIT_SPREAD = 0.40  # 그룹 가격 산포((최고-최저)/중앙값)가 이보다 크면 트림 계열로 세분.
-                          # 실측 분포 p50=23% p75=31% p90=35% 기준으로 p90 바로 위에 두어
-                          # 명백한 트림 혼재(예: 스토닉 1.0터보/1.4가솔린/1.6디젤)만 걸린다.
+TRIM_SPLIT_SPREAD = 0.40  # 그룹 가격 산포((최고-최저)/중앙값)가 이보다 크면 트림 계열로 세분
 
 # ── 수집 대상 ────────────────────────────────────────────────────────────────
 WWW = "https://www.kcar.com"
@@ -60,7 +62,7 @@ ENC_IV = b"sfq241sf3dscs321"
 
 KST = timezone(timedelta(hours=9))
 
-# ── 조건 (지시서 1절) ────────────────────────────────────────────────────────
+# ── 조건 ─────────────────────────────────────────────────────────────────────
 ALLOWED_MAKERS = {"현대", "기아", "제네시스"}
 FUEL_ALIASES = {
     "gasoline": "가솔린", "가솔린": "가솔린",
@@ -71,7 +73,7 @@ FUEL_ALIASES = {
 FUEL_FROM_KCAR = {"가솔린": "가솔린", "디젤": "디젤", "LPG": "LPG",
                   "가솔린+전기": "하이브리드", "LPG+전기": "하이브리드",
                   "디젤+전기": "하이브리드"}
-# carctgrNm(크기 기준 분류) → 지시서의 차종. None 이면 제외 대상.
+# carctgrNm(크기 기준 분류) → 차종. None 이면 제외 대상.
 BODY_FROM_CTGR = {"SUV": "SUV", "RV": "미니밴",
                   "소형차": "세단", "준중형차": "세단", "중형차": "세단",
                   "준대형차": "세단", "대형차": "세단",
@@ -82,12 +84,21 @@ KEICAR_HINTS = ["모닝", "레이", "캐스퍼", "스파크", "마티즈", "다�
 ACCIDENT_OK = {"무사고", "단순수리"}
 OPTION_PATTERNS = {
     "후방카메라": ["카메라 : 후방"],
+    "전방카메라": ["카메라 : 전방"],
+    "후방센서": ["감지센서 : 후방"],
+    "전방센서": ["감지센서 : 전방"],
     "통풍시트": ["통풍시트"],
     "열선시트": ["열선시트"],
+    "열선핸들": ["열선 : 스티어링"],
     "스마트키": ["스마트키"],
     "내비": ["내비게이션"],
     "크루즈": ["크루즈컨트롤"],
     "선루프": ["선루프", "썬루프"],
+    "후측방경보": ["후측방"],
+    "차선이탈경보": ["LDWS", "차선이탈"],
+    "자동긴급제동": ["자동긴급제동"],
+    "전동시트": ["전동시트"],
+    "하이패스": ["하이패스"],
 }
 # 총 구매비용 추정: 상세 페이지(Disallow)에 있는 K카 표시값을 쓸 수 없어 추정만 한다.
 ACQUISITION_TAX_RATE = 0.07   # 승용 중고차 취득세
@@ -160,7 +171,7 @@ def make_session():
 
 def post_list(session, param: dict) -> dict:
     r = session.post(API + LIST_PATH, json=enc_param(param), timeout=40)
-    if r.status_code in (403, 429) or r.status_code == 503:
+    if r.status_code in (403, 429, 503):
         raise Blocked(f"차단 신호 HTTP {r.status_code} — 우회하지 않고 중단한다.")
     body_head = r.text[:2000].lower()
     if any(w in body_head for w in ("captcha", "보안문자", "비정상적인 접근")):
@@ -173,7 +184,10 @@ def post_list(session, param: dict) -> dict:
 
 
 def collect(args) -> tuple[list[dict], int, str]:
-    """목록 API를 페이지네이션해 원본 행을 모은다. 반환: (rows, totalCnt, 수집일시)."""
+    """직영 재고 **전체**를 페이지네이션해 원본 행을 모은다.
+
+    서버측 필터를 걸지 않는다(시세 기준으로 쓰기 위해). 반환: (rows, totalCnt, 수집일시).
+    """
     raw_dir = args.raw_dir
     os.makedirs(raw_dir, exist_ok=True)
 
@@ -195,30 +209,26 @@ def collect(args) -> tuple[list[dict], int, str]:
     rules = fetch_robots(session)
     if not robots_allows(rules, LIST_PAGE):
         sys.exit(f"중단: robots.txt 가 {LIST_PAGE} 를 허용하지 않는다.")
-    print(f"[robots] {LIST_PAGE} 허용 확인. 상세 페이지 Disallow 목록: "
-          f"{[d for d in rules['disallow'] if 'detail' in d or 'car/info' in d]} → 조회하지 않음")
+    blocked_detail = [d for d in rules["disallow"] if "detail" in d or "car/info" in d]
+    print(f"[robots] {LIST_PAGE} 허용 확인. 상세 페이지 Disallow: {blocked_detail} → 조회하지 않음")
     time.sleep(args.sleep)
 
-    base = {
-        "wr_lt_prc": str(args.budget),
-        "wr_gt_mfg_dt": f"{args.year}01",
-        "wr_lt_milg": str(args.km),
-        "limit": args.limit,
-    }
     collected_at = datetime.now(KST).strftime("%Y-%m-%d %H:%M KST")
     rows: list[dict] = []
-    total = 0
-    page = 1
+    total, page = 0, 1
+    t0 = time.time()
     while page <= args.max_pages:
-        data = post_list(session, {**base, "pageno": page})
+        data = post_list(session, {"limit": args.limit, "pageno": page})
         total = data.get("totalCnt", 0)
         page_rows = data.get("rows") or []
-        with open(os.path.join(raw_dir, f"page_{page:02d}.json"), "w", encoding="utf-8") as fh:
+        with open(os.path.join(raw_dir, f"page_{page:03d}.json"), "w", encoding="utf-8") as fh:
             json.dump(data, fh, ensure_ascii=False)
         rows += page_rows
-        print(f"[fetch] page {page}/{data.get('totalPageCnt', '?')} rows={len(page_rows)} "
-              f"total={total}", flush=True)
-        if not page_rows or len(rows) >= total or page >= data.get("totalPageCnt", page):
+        pages = data.get("totalPageCnt", page)
+        if page == 1 or page % 10 == 0 or page >= pages:
+            print(f"[fetch] {page}/{pages} 페이지, 누적 {len(rows):,}/{total:,}대 "
+                  f"({time.time()-t0:.0f}초)", flush=True)
+        if not page_rows or page >= pages:
             break
         page += 1
         time.sleep(args.sleep)
@@ -228,7 +238,7 @@ def collect(args) -> tuple[list[dict], int, str]:
     return rows, total, collected_at
 
 
-# ── 정규화 / 필터 ────────────────────────────────────────────────────────────
+# ── 정규화 ───────────────────────────────────────────────────────────────────
 def to_int(v, default=None):
     try:
         return int(str(v).strip())
@@ -248,24 +258,14 @@ def body_type(row: dict) -> str | None:
 
 def options_of(row: dict) -> list[str]:
     raw = row.get("optnNm") or ""
-    found = []
-    for label, pats in OPTION_PATTERNS.items():
-        if any(p in raw for p in pats):
-            found.append(label)
-    return found
+    return [label for label, pats in OPTION_PATTERNS.items() if any(p in raw for p in pats)]
 
 
-def normalize(row: dict) -> dict | None:
-    """원본 행 → 정리된 매물 dict. 조건 미달이면 (사유, None) 대신 reject 이유를 담아 반환."""
+def normalize(row: dict) -> dict:
     car_cd = row.get("carCd")
     mfg = str(row.get("mfgDt") or "")
     price = to_int(row.get("prc"))
-    km = to_int(row.get("milg"))
-    fuel = FUEL_FROM_KCAR.get(row.get("fuelNm") or "")
-    body = body_type(row)
-    accident = (row.get("acdtHistCnts") or "").strip()
-    use = row.get("useNm") or ""
-    item = {
+    return {
         "id": car_cd,
         "url": DETAIL_URL.format(car_cd),
         "maker": row.get("mnuftrNm"),
@@ -274,22 +274,24 @@ def normalize(row: dict) -> dict | None:
         "full_name": row.get("carWhlNm"),
         "trim": " ".join(x for x in [row.get("grdNm"), row.get("grdDtlNm")]
                          if x and x != "세부등급 없음").strip(),
+        "grade_name": row.get("grdNm") or "",        # 트림 비교의 기준
         "trim_series": (row.get("grdNm") or "").split(" ")[0],
         "year_month": f"{mfg[:4]}-{mfg[4:6]}" if len(mfg) >= 6 else None,
         "year": to_int(mfg[:4]),
         "model_year": row.get("prdcnYr"),
-        "km": km,
+        "km": to_int(row.get("milg")),
         "price": price,
         "total_cost": None,          # K카 표시 총 구매비용: 상세 페이지 Disallow → 미수집
         "total_cost_est": (round(price * (1 + ACQUISITION_TAX_RATE) + TRANSFER_FEE_MANWON)
                            if price is not None else None),
-        "fuel": fuel,
+        "fuel": FUEL_FROM_KCAR.get(row.get("fuelNm") or ""),
         "fuel_raw": row.get("fuelNm"),
         "transmission": row.get("trnsmsnNm"),
         "cc": to_int(row.get("engdispmnt")),
-        "body_type": body,
+        "seats": to_int(row.get("pasngrCnt")),
+        "body_type": body_type(row),
         "category_raw": row.get("carctgrNm"),
-        "accident": accident,
+        "accident": (row.get("acdtHistCnts") or "").strip(),
         "insurance_history": None,   # 상세 페이지 Disallow → 미수집
         "owner_changes": None,       # 상세 페이지 Disallow → 미수집
         "options": "|".join(options_of(row)),
@@ -297,15 +299,19 @@ def normalize(row: dict) -> dict | None:
         "listed_date": None,         # 상세 페이지 Disallow → 미수집
         "warranty": None,            # 상세 페이지 Disallow → 미수집
         "photo": row.get("msizeImgPath") or row.get("lsizeImgPath"),
-        # useNm 은 '이력'이 아니라 K카의 추천 용도 태그다. 968대 표본에서 연료와 100% 일치
-        # (LPG·하이브리드·디젤 전량 '영업용', 가솔린 0건) → 영업용 이력 판정에 쓸 수 없다.
-        # 실제 영업용/렌터카 이력은 상세 보험이력(robots Disallow)에서 확인해야 한다.
-        "use_tag": use,
+        # useNm 은 '이력'이 아니라 K카의 추천 용도 태그다(연료와 100% 일치). 판정에 쓰지 않는다.
+        "use_tag": row.get("useNm") or "",
         "rent_reg": row.get("rentRegYn"),
         "reg_type": row.get("regType"),
         "seller_note": row.get("simcDesc"),
     }
-    return item
+
+
+def is_rental(item: dict) -> bool:
+    """렌터카 판정. rentRegYn 은 전 매물 'N' 이라 무용하므로 차명 표기를 함께 본다."""
+    return ((item["rent_reg"] or "N").upper() == "Y"
+            or (item["reg_type"] or "SELL") != "SELL"
+            or "렌터카" in (item["full_name"] or ""))
 
 
 def reject_reason(item: dict, args) -> str | None:
@@ -313,17 +319,16 @@ def reject_reason(item: dict, args) -> str | None:
         return "제조사"
     if item["body_type"] is None:
         return "차종제외(경차/화물/승합)"
+    if item["body_type"] == "미니밴":
+        return "미니밴 제외"
+    if item["seats"] != args.seats:
+        return f"{args.seats}인승 아님"
     if item["fuel"] is None or item["fuel"] not in args.fuel_set:
         return "연료"
     if item["accident"] not in ACCIDENT_OK:
         return "사고이력"
-    # 렌터카 제외. use_tag 는 추천 태그이므로 쓰지 않고, 등록 플래그와 차명·트림에 박힌
-    # 표기('...LPI 렌터카 프레스티지', '(렌터카용)')로 판단한다. simcDesc 는 대부분
-    # '렌트이력無' 같은 긍정 문구라 판단 근거로 쓰지 않는다.
-    if (item["rent_reg"] or "N").upper() == "Y" or (item["reg_type"] or "SELL") != "SELL":
-        return "렌터카/렌트등록"
-    if "렌터카" in (item["full_name"] or ""):
-        return "렌터카 트림 표기"
+    if is_rental(item):
+        return "렌터카"
     if item["price"] is None or item["price"] > args.budget:
         return "예산초과"
     if item["total_cost_est"] is not None and item["total_cost_est"] > args.total_budget:
@@ -335,48 +340,119 @@ def reject_reason(item: dict, args) -> str | None:
     return None
 
 
-# ── 시세 비교 ────────────────────────────────────────────────────────────────
-def peers_of(item: dict, pool: list[dict], key: str) -> list[dict]:
-    """같은 model(또는 model+트림계열) + 연식 ±1년."""
-    return [p for p in pool
-            if p[key] == item[key] and p["model"] == item["model"]
+# ── 시세 비교 (전체 재고를 기준으로) ────────────────────────────────────────
+def comparable_pool(market: list[dict]) -> list[dict]:
+    """시세 기준이 될 비교군. 사고차·렌터카는 값이 따로 형성되므로 뺀다."""
+    return [m for m in market
+            if m["price"] and m["km"] is not None and m["year"]
+            and m["accident"] in ACCIDENT_OK and not is_rental(m)]
+
+
+def _cc_bucket(item: dict) -> int:
+    """배기량 200cc 단위 버킷. 1.6과 2.0을 같은 그룹에 넣지 않기 위한 것."""
+    return round((item["cc"] or 0) / 200)
+
+
+def peer_group(item: dict, pool: list[dict]) -> tuple[list[dict], str]:
+    """가장 정확한 비교군을 고른다(넓은 쪽으로 단계적 후퇴).
+
+    같은 세대·같은 좌석수·연식 ±1년을 바닥으로 두고, 그 안에서
+    연료 → 배기량 → 트림까지 좁힌 뒤 3대 이상 남는 가장 좁은 그룹을 쓴다.
+
+    이렇게 하는 이유: 트림 차이가 가격을 크게 가른다. 예를 들어 쏘나타 DN8은
+    최하 트림과 최상 트림이 1,170만원 대 2,220만원이라, 세대만 묶어 중앙값을 내면
+    최하 트림 매물이 실제보다 훨씬 싸 보인다. 반대로 스토닉은 1.4 가솔린과
+    1.6 디젤이 섞이면 연료 때문에 왜곡된다.
+    """
+    base = [p for p in pool
+            if p["model"] == item["model"] and p["seats"] == item["seats"]
             and abs((p["year"] or 0) - (item["year"] or 0)) <= 1]
+    same_fuel = [p for p in base if p["fuel"] == item["fuel"]]
+    same_cc = [p for p in same_fuel if _cc_bucket(p) == _cc_bucket(item)]
+    # grdNm 에는 엔진·구동방식(예 '2.0 가솔린', '디젤 1.7 2WD')이, grdDtlNm 에는
+    # 트림 등급(예 '스마트', '인스퍼레이션')이 들어 있다. 가격을 가르는 것은 둘 다이므로
+    # 엔진 단계와 트림 단계를 따로 둔다.
+    same_engine = [p for p in same_cc if p["grade_name"] == item["grade_name"]]
+    same_trim = [p for p in same_engine if p["trim"] == item["trim"]]
+    for cand, label in ((same_trim, "같은 세대·연료·배기량·트림"),
+                        (same_engine, "같은 세대·연료·엔진(트림 등급 섞임)"),
+                        (same_cc, "같은 세대·연료·배기량(트림 섞임)"),
+                        (same_fuel, "같은 세대·연료(배기량·트림 섞임)"),
+                        (base, "같은 세대만(연료·트림 섞임)")):
+        if len(cand) >= MIN_GROUP_SIZE:
+            return cand, label
+    return base, "비교불가"
 
 
-def add_market_gaps(items: list[dict]) -> None:
+def add_market_gaps(items: list[dict], pool: list[dict]) -> None:
     for it in items:
-        group = peers_of(it, items, "model")
-        note = ""
-        if len(group) >= MIN_GROUP_SIZE:
-            prices = [g["price"] for g in group]
-            spread = (max(prices) - min(prices)) / statistics.median(prices)
-            if spread > TRIM_SPLIT_SPREAD:
-                sub = peers_of(it, items, "trim_series")
-                if len(sub) >= MIN_GROUP_SIZE:
-                    group, note = sub, "트림계열 세분(가격 산포 큼)"
-                else:
-                    note = f"트림 혼재 주의(산포 {spread:.0%})"
-        it["group_key"] = f"{it['model']} {it['year']}±1"
-        if note.startswith("트림계열"):
-            it["group_key"] += f" / {it['trim_series']} 계열"
+        group, basis = peer_group(it, pool)
+        it["group_basis"] = basis
         it["group_n"] = len(group)
-        it["group_note"] = note
-        if len(group) < MIN_GROUP_SIZE:
-            it["group_median_price"] = None
-            it["group_median_km"] = None
-            it["price_gap"] = None
-            it["km_gap"] = None
-            it["group_note"] = f"비교불가(그룹 {len(group)}대<{MIN_GROUP_SIZE})"
+        it["group_key"] = f"{it['model']} {it['year']}±1 / {basis}"
+        if basis == "비교불가" or len(group) < MIN_GROUP_SIZE:
+            it.update(group_median_price=None, group_median_km=None,
+                      price_gap=None, km_gap=None,
+                      group_note=f"비교불가(그룹 {len(group)}대<{MIN_GROUP_SIZE})")
             continue
-        mp = statistics.median([g["price"] for g in group])
+        prices = [g["price"] for g in group]
+        mp = statistics.median(prices)
         mk = statistics.median([g["km"] for g in group])
+        spread = (max(prices) - min(prices)) / mp if mp else 0
         it["group_median_price"] = round(mp, 1)
         it["group_median_km"] = int(mk)
         it["price_gap"] = round((mp - it["price"]) / mp, 4) if mp else None
         it["km_gap"] = round((mk - it["km"]) / mk, 4) if mk else None
+        # 트림까지 좁히지 못했고 산포가 크면 시세차를 그대로 믿지 말라고 표시한다.
+        it["group_note"] = ("" if basis.endswith("트림") or spread <= TRIM_SPLIT_SPREAD
+                            else f"비교군 가격 산포 {spread:.0%} — 시세차를 그대로 믿지 말 것")
 
 
-# ── 점수 ─────────────────────────────────────────────────────────────────────
+# ── 시장 통계 (웹검색 대신 전체 재고에서 직접 뽑는 관점) ────────────────────
+def market_stats(market: list[dict], pool: list[dict]) -> dict:
+    """모델별 재고 수와 연식별 시세. 재고가 많은 차 = 부품·정비·재판매가 쉬운 차."""
+    by_model: dict[str, list[dict]] = {}
+    for m in pool:
+        if m["model_group"]:
+            by_model.setdefault(m["model_group"], []).append(m)
+    total = len(pool)
+    stats = {}
+    for name, cars in by_model.items():
+        years = {}
+        for c in cars:
+            years.setdefault(c["year"], []).append(c["price"])
+        stats[name] = {
+            "count": len(cars),
+            "share": round(len(cars) / total, 5),
+            "median_price_by_year": {str(y): round(statistics.median(p), 1)
+                                     for y, p in sorted(years.items()) if len(p) >= 2},
+        }
+    ranked = sorted(stats, key=lambda k: -stats[k]["count"])
+    for i, name in enumerate(ranked, 1):
+        stats[name]["rank"] = i
+
+    # 세대(model)별 연식 시세 — 감가를 보여줄 때는 세대를 섞으면 안 된다.
+    # (예: '그랜저'로 묶으면 HG·IG·GN7 이 섞여 곡선이 왜곡된다)
+    gens: dict[str, dict] = {}
+    for m in pool:
+        if not m["model"] or not m["year"]:
+            continue
+        g = gens.setdefault(m["model"], {"count": 0, "by_year": {}, "by_seats": {}})
+        g["count"] += 1
+        g["by_year"].setdefault(m["year"], []).append(m["price"])
+        g["by_seats"][str(m["seats"])] = g["by_seats"].get(str(m["seats"]), 0) + 1
+    for name, g in gens.items():
+        g["median_price_by_year"] = {str(y): round(statistics.median(p), 1)
+                                     for y, p in sorted(g["by_year"].items()) if len(p) >= 2}
+        g["year_counts"] = {str(y): len(p) for y, p in sorted(g["by_year"].items())}
+        del g["by_year"]
+
+    return {"total_comparable": total, "total_collected": len(market),
+            "models": stats, "model_count": len(stats),
+            "generations": gens, "generation_count": len(gens)}
+
+
+# ── 점수 (분석용 표에서만 쓴다. 안내 페이지는 점수를 쓰지 않는다) ───────────
 def score_items(items: list[dict]) -> None:
     for it in items:
         parts: dict[str, float] = {}
@@ -398,20 +474,22 @@ def score_items(items: list[dict]) -> None:
 
 
 CSV_FIELDS = ["id", "url", "maker", "model", "model_group", "full_name", "trim", "trim_series",
-              "year_month", "year", "model_year", "km", "price", "total_cost",
-              "total_cost_est", "fuel", "fuel_raw", "transmission", "cc", "body_type",
-              "category_raw", "accident", "insurance_history", "owner_changes",
+              "grade_name", "year_month", "year", "model_year", "km", "price", "total_cost",
+              "total_cost_est", "fuel", "fuel_raw", "transmission", "cc", "seats",
+              "body_type", "category_raw", "accident", "insurance_history", "owner_changes",
               "options", "location", "listed_date", "warranty", "photo",
-              "use_tag", "rent_reg", "reg_type", "group_key", "group_n", "group_median_price",
-              "group_median_km", "price_gap", "km_gap", "group_note", "score"]
+              "use_tag", "rent_reg", "reg_type", "group_key", "group_n",
+              "group_median_price", "group_median_km", "price_gap", "km_gap",
+              "group_basis", "group_note", "score"]
 
 
-def write_csv(items: list[dict], path: str, collected_at: str, total_cnt: int) -> None:
+def write_csv(items: list[dict], path: str, collected_at: str, total_cnt: int,
+              pool_cnt: int) -> None:
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     with open(path, "w", encoding="utf-8", newline="") as fh:
         fh.write(f"# 출처 K카(kcar.com) 직영 매물 목록 API. 수집 {collected_at}. "
-                 f"수집 {total_cnt}대 중 조건 통과 {len(items)}대. "
-                 f"개인 검토용 비공식 분석, 상업적 이용 금지. "
+                 f"직영 재고 전체 {total_cnt}대 수집(시세 비교군 {pool_cnt}대) 중 "
+                 f"조건 통과 {len(items)}대. 개인 검토용 비공식 분석, 상업적 이용 금지. "
                  f"total_cost/insurance_history/owner_changes/listed_date/warranty 는 "
                  f"상세 페이지가 robots.txt Disallow 라 미수집(null).\n")
         w = csv.DictWriter(fh, fieldnames=CSV_FIELDS, extrasaction="ignore")
@@ -421,20 +499,22 @@ def write_csv(items: list[dict], path: str, collected_at: str, total_cnt: int) -
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="K카 직영 중고차 꿀매물 수집·점수화")
+    ap = argparse.ArgumentParser(description="K카 직영 전체 재고 수집·시세 비교·후보 선별")
     ap.add_argument("--budget", type=int, default=1300, help="차량가 상한(만원)")
-    ap.add_argument("--total-budget", type=int, default=1400, help="총 구매비용 상한(만원, 추정치 기준)")
+    ap.add_argument("--total-budget", type=int, default=1400,
+                    help="총 구매비용 상한(만원, 추정치 기준)")
     ap.add_argument("--year", type=int, default=2017, help="연식 하한")
     ap.add_argument("--km", type=int, default=120000, help="주행거리 상한")
+    ap.add_argument("--seats", type=int, default=5, help="좌석 수 (기본 5인승)")
     ap.add_argument("--fuel", default="gasoline,hybrid,lpg,diesel",
                     help="허용 연료 (gasoline,hybrid,lpg,diesel)")
     ap.add_argument("--out", default="data/listings.csv")
     ap.add_argument("--limit", type=int, default=100, help="페이지당 건수")
-    ap.add_argument("--max-pages", type=int, default=40)
+    ap.add_argument("--max-pages", type=int, default=200)
     ap.add_argument("--sleep", type=float, default=1.8, help="요청 간 대기(초)")
-    ap.add_argument("--raw-dir", default="data/raw/pages")
+    ap.add_argument("--raw-dir", default="data/raw/market")
     ap.add_argument("--use-cache", action="store_true",
-                    help="네트워크 요청 없이 data/raw/pages 의 원본으로 재계산")
+                    help="네트워크 요청 없이 원본 캐시로 재계산")
     args = ap.parse_args()
     args.fuel_set = {FUEL_ALIASES[f.strip()] for f in args.fuel.split(",") if f.strip()}
 
@@ -443,32 +523,47 @@ def main() -> None:
     except Blocked as e:
         sys.exit(f"중단(차단 감지): {e}")
 
-    seen, items, rejects = set(), [], {}
+    # 전체 재고 정규화 (중복 제거)
+    seen, market = set(), []
     for row in rows:
-        if not row.get("carCd") or row["carCd"] in seen:
+        cd = row.get("carCd")
+        if not cd or cd in seen:
             continue
-        seen.add(row["carCd"])
-        it = normalize(row)
+        seen.add(cd)
+        market.append(normalize(row))
+
+    pool = comparable_pool(market)
+
+    # 조건 필터
+    items, rejects = [], {}
+    for it in market:
         why = reject_reason(it, args)
         if why:
             rejects[why] = rejects.get(why, 0) + 1
-            continue
-        items.append(it)
+        else:
+            items.append(it)
 
-    add_market_gaps(items)
+    add_market_gaps(items, pool)
     score_items(items)
-    write_csv(items, args.out, collected_at, len(seen))
+    write_csv(items, args.out, collected_at, len(market), len(pool))
+
+    stats = market_stats(market, pool)
+    outdir = os.path.dirname(args.out) or "."
+    with open(os.path.join(outdir, "market_stats.json"), "w", encoding="utf-8") as fh:
+        json.dump(stats, fh, ensure_ascii=False, indent=2)
 
     meta = {
         "collected_at": collected_at,
-        "source": "K카(kcar.com) 직영 매물 목록 API",
-        "collected": len(seen),
+        "source": "K카(kcar.com) 직영 매물 목록 API (전체 재고)",
+        "collected": len(market),
         "api_total": total_cnt,
+        "comparable_pool": len(pool),
         "passed": len(items),
         "rejects": rejects,
         "conditions": {"budget": args.budget, "total_budget": args.total_budget,
-                       "year": args.year, "km": args.km,
-                       "fuel": sorted(args.fuel_set)},
+                       "year": args.year, "km": args.km, "seats": args.seats,
+                       "fuel": sorted(args.fuel_set),
+                       "exclude": ["경차", "화물", "승합", "미니밴", "렌터카", "사고"]},
         "weights": {"price_gap": W_PRICE_GAP, "km_gap": W_KM_GAP,
                     "accident": W_ACCIDENT, "owner_few": W_OWNER_FEW,
                     "option_each": W_OPTION_EACH, "fuel": W_FUEL,
@@ -480,19 +575,16 @@ def main() -> None:
                                  + W_OPTION_EACH * len(SCORE_OPTIONS)
                                  + max(W_FUEL.values())),
     }
-    meta_path = os.path.join(os.path.dirname(args.out) or ".", "meta.json")
-    with open(meta_path, "w", encoding="utf-8") as fh:
+    with open(os.path.join(outdir, "meta.json"), "w", encoding="utf-8") as fh:
         json.dump(meta, fh, ensure_ascii=False, indent=2)
 
-    print(f"\n수집 {len(seen)}대(API 총 {total_cnt}) → 조건 통과 {len(items)}대")
+    print(f"\n직영 재고 {len(market):,}대 수집(API 총 {total_cnt:,}) "
+          f"→ 시세 비교군 {len(pool):,}대 → 조건 통과 {len(items):,}대")
     for why, n in sorted(rejects.items(), key=lambda x: -x[1]):
-        print(f"  제외 {n:4d}  {why}")
+        print(f"  제외 {n:5,d}  {why}")
     ncmp = sum(1 for i in items if i["price_gap"] is None)
     print(f"  시세 비교 불가(그룹<{MIN_GROUP_SIZE}): {ncmp}대")
-    print(f"CSV: {args.out}")
-    for i, it in enumerate(sorted(items, key=lambda x: -x["score"])[:10], 1):
-        print(f"  {i:2d}. {it['score']:5.1f} {it['maker']} {it['model']} {it['trim']} "
-              f"{it['year_month']} {it['km']:,}km {it['price']}만원 {it['accident']}")
+    print(f"CSV: {args.out} / 시장통계: {outdir}/market_stats.json")
 
 
 if __name__ == "__main__":

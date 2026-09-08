@@ -9,7 +9,7 @@ K카(kcar.com) 직영 국산 중고차 매물을 수집해 같은 세대·연식
 
 ```bash
 pip install --user requests pycryptodome                 # 의존성 2개
-python3.11 search_kcar.py --out data/listings.csv        # 수집 + 시세비교 + 점수
+python3.11 search_kcar.py --out data/listings.csv        # 직영 재고 전체 수집 + 시세비교
 python3.11 build_report.py                               # docs/report.md + docs/index.html
 ```
 
@@ -21,7 +21,7 @@ python3.11 build_report.py                               # docs/report.md + docs
 `search_kcar.py` 인자로 바꾼다.
 
 ```bash
-python3.11 search_kcar.py --budget 1500 --year 2019 --km 90000 --fuel hybrid,gasoline
+python3.11 search_kcar.py --budget 1500 --year 2019 --km 90000 --seats 5 --fuel hybrid,gasoline
 python3.11 build_report.py
 ```
 
@@ -31,6 +31,7 @@ python3.11 build_report.py
 | `--total-budget` | 총 구매비용 상한(만원, 추정치 기준) | 1400 |
 | `--year` | 연식 하한 | 2017 |
 | `--km` | 주행거리 상한 | 120000 |
+| `--seats` | 좌석 수 (5인승만 고르려면 5) | 5 |
 | `--fuel` | `gasoline,hybrid,lpg,diesel` 중 선택 | 전부 |
 | `--sleep` | 요청 간 대기(초) | 1.8 |
 
@@ -60,3 +61,18 @@ python3.11 build_report.py   # docs/report.md + docs/all.html (분석용)
 ```
 
 차종 지식(엔진 판별, 차급, 연비·세금, 확인 항목 문구)은 `car_knowledge.py` 에 모여 있다.
+
+## 수집·비교 방식
+
+**직영 재고 전체를 받는다.** 예산 이하 매물만 받아 중앙값을 내면 "예산 이하 차들끼리의
+중앙값"이 되어 시세가 실제보다 낮게 잡힌다. 그래서 직영 재고 전량(약 7,400대)을 받아
+시세 기준으로 쓰고, 조건 필터는 그 다음에 건다. 요청은 75회 내외, 순차·1.8초 간격.
+
+**비교군은 좁은 쪽부터 단계적으로 후퇴한다.** 같은 세대 + 같은 좌석수 + 연식 ±1년을
+바닥으로 두고, 그 안에서 연료 → 배기량 → 엔진(`grdNm`) → 트림 등급(`grdDtlNm`)까지
+좁힌 뒤 3대 이상 남는 **가장 좁은 그룹**을 쓴다. 트림이 가격을 크게 가르기 때문이다
+(예: 쏘나타 DN8은 최하 트림 1,170만원, 최상 트림 2,220만원).
+트림까지 맞추지 못한 경우 안내 페이지는 **시세차를 주장하지 않고** 그 사실을 표시한다.
+
+`data/market_stats.json` 에 차종별 재고량·순위와 세대별 연식 시세가 저장된다.
+안내 페이지는 이 값으로 "흔한 차인가"(부품·정비·재판매)와 감가 흐름을 보여준다.

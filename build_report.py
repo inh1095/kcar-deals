@@ -44,13 +44,14 @@ def why_good(r: dict) -> str:
     bits = []
     if r["price_gap"] is not None and r["price_gap"] > 0.02:
         gap_won = r["group_median_price"] - r["price"]
-        bits.append(f"동일 세대·연식±1년 {r['group_n']}대 중앙값 {r['group_median_price']:,.0f}만원보다 "
+        bits.append(f"{r.get('group_basis','비교군')} {r['group_n']}대 중앙값 "
+                    f"{r['group_median_price']:,.0f}만원보다 "
                     f"{gap_won:,.0f}만원({r['price_gap']:.0%}) 저렴")
     elif r["price_gap"] is None:
         bits.append(f"비교군 부족({r['group_n']}대)이라 시세 비교 없이 절대값 기준 "
                     f"{r['price']:,}만원")
     if r["km_gap"] is not None and r["km_gap"] > 0.05:
-        bits.append(f"주행거리도 그룹 중앙값 {r['group_median_km']:,}km보다 "
+        bits.append(f"주행거리도 비교군 중앙값 {r['group_median_km']:,}km보다 "
                     f"{r['group_median_km'] - r['km']:,}km 적음")
     elif r["km"] is not None and r["km"] <= 70000:
         bits.append(f"주행 {r['km']:,}km로 절대적으로 짧음")
@@ -210,7 +211,7 @@ def build_md(rows: list[dict], meta: dict) -> str:
             A(f"- {what_to_check(r)}")
             A("")
 
-    A("## 그룹별 시세 (같은 세대 + 연식 ±1년, 3대 이상 그룹)")
+    A("## 비교군별 시세 (같은 세대·연료·배기량·트림 + 연식 ±1년, 3대 이상)")
     A("")
     A("| 그룹 | 대수 | 가격 중앙값 | 가격 범위 | 주행 중앙값 | 비고 |")
     A("|---|---:|---:|---|---:|---|")
@@ -432,7 +433,7 @@ Disallow하므로 <b>상세 페이지는 조회하지 않았습니다</b>(목록
 {html_cards(overall)}
 {''.join(seg_html)}
 
-<h2>그룹별 시세 (같은 세대 + 연식 ±1년, 3대 이상)</h2>
+<h2>비교군별 시세 (같은 세대·연료·배기량·트림 + 연식 ±1년, 3대 이상)</h2>
 <div class="wrap"><table id="t-grp"><thead><tr><th>그룹</th><th class="num">대수</th>
 <th class="num">가격 중앙값(만)</th><th>가격 범위(만)</th><th class="num">주행 중앙값(km)</th>
 <th>비고</th></tr></thead><tbody>{gt}</tbody></table></div>
