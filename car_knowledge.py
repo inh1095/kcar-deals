@@ -80,7 +80,8 @@ SIZE_VAN = "미니밴"
 SIZE_BY_MODEL = [
     ("스토닉", SIZE_SMALL_SUV), ("코나", SIZE_SMALL_SUV), ("베뉴", SIZE_SMALL_SUV),
     ("셀토스", SIZE_SMALL_SUV),
-    ("니로", SIZE_MID_SUV), ("투싼", SIZE_MID_SUV), ("스포티지", SIZE_MID_SUV),
+    # 니로는 전장 4,355mm 로 셀토스(4,375mm)보다 작다. 소형 SUV 로 둔다.
+    ("니로", SIZE_SMALL_SUV), ("투싼", SIZE_MID_SUV), ("스포티지", SIZE_MID_SUV),
     ("싼타페", SIZE_LARGE_SUV), ("쏘렌토", SIZE_LARGE_SUV), ("모하비", SIZE_LARGE_SUV),
     ("카니발", SIZE_VAN), ("카렌스", SIZE_VAN),
     ("쏘울", SIZE_COMPACT), ("아반떼", SIZE_COMPACT), ("i30", SIZE_COMPACT),

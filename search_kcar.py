@@ -82,6 +82,11 @@ BODY_FROM_CTGR = {"SUV": "SUV", "RV": "미니밴",
 HATCHBACK_HINTS = ["i30", "벨로스터", "K3 GT", "프라이드", "아이오닉", "씨드", "i20", "해치"]
 KEICAR_HINTS = ["모닝", "레이", "캐스퍼", "스파크", "마티즈", "다마스", "라보"]
 ACCIDENT_OK = {"무사고", "단순수리"}
+# SUV 크기 상한: 셀토스(전장 4,375mm)급까지만 허용한다. 세단은 크기 제한이 없다
+# (준대형 세단은 낮고 길어 주차 부담이 SUV보다 작다는 판단).
+# 참고 전장: 베뉴 4,040 / 스토닉 4,140 / 코나 4,165~4,350 / 니로 4,355 / 셀토스 4,375
+#          || 투싼 4,630 / 스포티지 4,660 / 쏘렌토 4,810 / 싼타페 4,785
+SMALL_SUV_ALLOW = {"스토닉", "코나", "베뉴", "셀토스", "니로"}
 OPTION_PATTERNS = {
     # 주차·후방 시야
     "후방카메라": ["카메라 : 후방"],
@@ -350,6 +355,9 @@ def reject_reason(item: dict, args) -> str | None:
         return "차종제외(경차/화물/승합)"
     if item["body_type"] == "미니밴":
         return "미니밴 제외"
+    if item["body_type"] == "SUV" and args.suv_limit \
+            and (item["model_group"] or "") not in SMALL_SUV_ALLOW:
+        return "SUV가 셀토스보다 큼"
     if item["seats"] != args.seats:
         return f"{args.seats}인승 아님"
     if item["fuel"] is None or item["fuel"] not in args.fuel_set:
@@ -437,6 +445,30 @@ def add_market_gaps(items: list[dict], pool: list[dict]) -> None:
                             else f"비교군 가격 산포 {spread:.0%} — 시세차를 그대로 믿지 말 것")
 
 
+def add_trim_rank(items: list[dict], pool: list[dict]) -> None:
+    """세대 안에서 이 차의 트림이 몇 번째 등급인지 매긴다.
+
+    '다시 팔지 않고 오래 탄다'면 감가보다 **같은 돈으로 얼마나 좋은 트림을 사는가**가
+    중요하다. 같은 세대의 트림별 시세 중앙값 순서를 트림 등급의 대리 지표로 쓴다.
+    (연식·주행거리가 섞여 있어 정확한 등급표는 아니고 시장이 보는 순서다.)
+    """
+    by_gen: dict[str, dict[str, list[int]]] = {}
+    for p in pool:
+        if p["model"] and p["trim"]:
+            by_gen.setdefault(p["model"], {}).setdefault(p["trim"], []).append(p["price"])
+    for it in items:
+        trims = by_gen.get(it["model"], {})
+        med = {t: statistics.median(v) for t, v in trims.items() if len(v) >= 2}
+        it["equip_n"] = len([o for o in (it["options"] or "").split("|") if o])
+        it["equip_total"] = len(OPTION_PATTERNS)
+        if len(med) < 2 or it["trim"] not in med:
+            it["trim_rank"], it["trim_total"] = None, len(med)
+            continue
+        order = sorted(med, key=lambda t: -med[t])
+        it["trim_rank"] = order.index(it["trim"]) + 1
+        it["trim_total"] = len(order)
+
+
 # ── 시장 통계 (웹검색 대신 전체 재고에서 직접 뽑는 관점) ────────────────────
 def market_stats(market: list[dict], pool: list[dict]) -> dict:
     """모델별 재고 수와 연식별 시세. 재고가 많은 차 = 부품·정비·재판매가 쉬운 차."""
@@ -507,6 +539,7 @@ CSV_FIELDS = ["id", "url", "maker", "model", "model_group", "full_name", "trim",
               "total_cost_est", "fuel", "fuel_raw", "transmission", "cc", "seats",
               "body_type", "category_raw", "accident", "insurance_history", "owner_changes",
               "options", "airbags", "adas", "adas_n", "parking_aid_n",
+              "equip_n", "equip_total", "trim_rank", "trim_total",
               "location", "listed_date", "warranty", "photo",
               "use_tag", "rent_reg", "reg_type", "group_key", "group_n",
               "group_median_price", "group_median_km", "price_gap", "km_gap",
@@ -536,6 +569,9 @@ def main() -> None:
     ap.add_argument("--year", type=int, default=2020, help="연식 하한")
     ap.add_argument("--km", type=int, default=100000, help="주행거리 상한")
     ap.add_argument("--seats", type=int, default=5, help="좌석 수 (기본 5인승)")
+    ap.add_argument("--no-suv-limit", dest="suv_limit", action="store_false",
+                    help="SUV 크기 상한(셀토스급)을 풀고 투싼·스포티지·싼타페까지 포함")
+    ap.set_defaults(suv_limit=True)
     ap.add_argument("--fuel", default="gasoline,hybrid,lpg,diesel",
                     help="허용 연료 (gasoline,hybrid,lpg,diesel)")
     ap.add_argument("--out", default="data/listings.csv")
@@ -574,6 +610,7 @@ def main() -> None:
             items.append(it)
 
     add_market_gaps(items, pool)
+    add_trim_rank(items, pool)
     score_items(items)
     write_csv(items, args.out, collected_at, len(market), len(pool))
 

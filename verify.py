@@ -176,6 +176,10 @@ def main() -> None:
         passed = tag in gbody
         ok &= passed
         print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
+    cmp_rows = sum(n for tid, n in gscan.rows.items() if tid.startswith("cmp"))
+    passed = cmp_rows == len(rows)
+    ok &= passed
+    print(f"  {'OK  ' if passed else 'DIFF'} 전체 비교표 행 수: 가이드={cmp_rows} / CSV={len(rows)}")
     print(f"       참고: 가이드 내 표 {dict(gscan.rows)}")
 
     print()
