@@ -1,0 +1,55 @@
+{
+  "collected_at": "2026-09-08 17:21 KST",
+  "source": "K카(kcar.com) 직영 매물 목록 API",
+  "collected": 968,
+  "api_total": 968,
+  "passed": 319,
+  "rejects": {
+    "사고이력": 50,
+    "렌터카 트림 표기": 7,
+    "연료": 2,
+    "제조사": 358,
+    "차종제외(경차/화물/승합)": 232
+  },
+  "conditions": {
+    "budget": 1300,
+    "total_budget": 1400,
+    "year": 2017,
+    "km": 120000,
+    "fuel": [
+      "LPG",
+      "가솔린",
+      "디젤",
+      "하이브리드"
+    ]
+  },
+  "weights": {
+    "price_gap": 30.0,
+    "km_gap": 20.0,
+    "accident": {
+      "무사고": 20.0,
+      "단순수리": 10.0
+    },
+    "owner_few": 10.0,
+    "option_each": 2.5,
+    "fuel": {
+      "하이브리드": 5.0,
+      "가솔린": 0.0,
+      "LPG": 0.0,
+      "디젤": -5.0
+    },
+    "new_listing": 3.0
+  },
+  "unavailable_fields": [
+    "total_cost",
+    "insurance_history",
+    "owner_changes",
+    "listed_date",
+    "warranty"
+  ],
+  "unscored_items": [
+    "소유자 변경 1회 이하(10점)",
+    "등록 7일 이내(+3점)"
+  ],
+  "max_attainable_score": 85.0
+}

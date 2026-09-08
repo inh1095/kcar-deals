@@ -40,7 +40,9 @@ PRICE_GAP_FULL = 0.20     # 그룹 중앙값보다 20% 저렴하면 가격 항�
 KM_GAP_FULL = 0.30        # 그룹 중앙값보다 30% 덜 탔으면 주행거리 항목 만점
 SCORE_OPTIONS = ["후방카메라", "열선시트", "스마트키", "내비"]
 MIN_GROUP_SIZE = 3        # 그룹 매물 수가 이보다 적으면 시세 비교 불가
-TRIM_SPLIT_SPREAD = 0.60  # 그룹 가격 산포가 이보다 크면 트림 계열로 세분
+TRIM_SPLIT_SPREAD = 0.40  # 그룹 가격 산포((최고-최저)/중앙값)가 이보다 크면 트림 계열로 세분.
+                          # 실측 분포 p50=23% p75=31% p90=35% 기준으로 p90 바로 위에 두어
+                          # 명백한 트림 혼재(예: 스토닉 1.0터보/1.4가솔린/1.6디젤)만 걸린다.
 
 # ── 수집 대상 ────────────────────────────────────────────────────────────────
 WWW = "https://www.kcar.com"
@@ -291,7 +293,7 @@ def normalize(row: dict) -> dict | None:
         "insurance_history": None,   # 상세 페이지 Disallow → 미수집
         "owner_changes": None,       # 상세 페이지 Disallow → 미수집
         "options": "|".join(options_of(row)),
-        "location": f"{row.get('cntrNm') or ''}({row.get('cntrRgnNm') or ''})".strip("()"),
+        "location": " ".join(x for x in [row.get("cntrNm"), row.get("cntrRgnNm")] if x),
         "listed_date": None,         # 상세 페이지 Disallow → 미수집
         "warranty": None,            # 상세 페이지 Disallow → 미수집
         "photo": row.get("msizeImgPath") or row.get("lsizeImgPath"),
@@ -456,6 +458,31 @@ def main() -> None:
     add_market_gaps(items)
     score_items(items)
     write_csv(items, args.out, collected_at, len(seen))
+
+    meta = {
+        "collected_at": collected_at,
+        "source": "K카(kcar.com) 직영 매물 목록 API",
+        "collected": len(seen),
+        "api_total": total_cnt,
+        "passed": len(items),
+        "rejects": rejects,
+        "conditions": {"budget": args.budget, "total_budget": args.total_budget,
+                       "year": args.year, "km": args.km,
+                       "fuel": sorted(args.fuel_set)},
+        "weights": {"price_gap": W_PRICE_GAP, "km_gap": W_KM_GAP,
+                    "accident": W_ACCIDENT, "owner_few": W_OWNER_FEW,
+                    "option_each": W_OPTION_EACH, "fuel": W_FUEL,
+                    "new_listing": W_NEW_LISTING},
+        "unavailable_fields": ["total_cost", "insurance_history", "owner_changes",
+                               "listed_date", "warranty"],
+        "unscored_items": ["소유자 변경 1회 이하(10점)", "등록 7일 이내(+3점)"],
+        "max_attainable_score": (W_PRICE_GAP + W_KM_GAP + max(W_ACCIDENT.values())
+                                 + W_OPTION_EACH * len(SCORE_OPTIONS)
+                                 + max(W_FUEL.values())),
+    }
+    meta_path = os.path.join(os.path.dirname(args.out) or ".", "meta.json")
+    with open(meta_path, "w", encoding="utf-8") as fh:
+        json.dump(meta, fh, ensure_ascii=False, indent=2)
 
     print(f"\n수집 {len(seen)}대(API 총 {total_cnt}) → 조건 통과 {len(items)}대")
     for why, n in sorted(rejects.items(), key=lambda x: -x[1]):
