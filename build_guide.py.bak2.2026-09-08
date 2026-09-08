@@ -33,7 +33,6 @@ LIST_N = 40
 COMMON_STRONG = 100      # 이 이상이면 아주 흔한 차
 COMMON_OK = 30
 RARE = 15                # 이 미만이면 드문 차
-MIN_ADAS_FOR_PICK = 2    # 추천 목록에 넣을 최소 첨단 안전장치 개수
 
 DISCLAIMER = ("개인이 참고용으로 만든 비공식 정리입니다. 가격과 매물 상태는 수시로 바뀌고 "
               "차는 팔리면 사라집니다. 실제 구매 결정은 반드시 매물 페이지와 현장에서 "
@@ -56,12 +55,11 @@ def load(csv_path="data/listings.csv"):
     stats = _json(os.path.join(d, "market_stats.json"))
     for r in rows:
         for k in ("km", "price", "year", "cc", "seats", "group_n", "total_cost_est",
-                  "group_median_km", "airbags", "adas_n", "parking_aid_n"):
+                  "group_median_km"):
             r[k] = int(float(r[k])) if r.get(k) not in ("", None) else None
         for k in ("price_gap", "km_gap", "group_median_price"):
             r[k] = float(r[k]) if r.get(k) not in ("", None) else None
         r["opt"] = [o for o in (r.get("options") or "").split("|") if o]
-        r["adas_list"] = [o for o in (r.get("adas") or "").split("|") if o]
     return rows, meta, stats
 
 
@@ -72,7 +70,7 @@ def _json(path):
 # ── 매물 평가 ────────────────────────────────────────────────────────────────
 def evaluate(r: dict, stats: dict) -> dict:
     """경고·주의·좋은 점과 확인 항목을 만든다. 숫자 점수는 만들지 않는다."""
-    pt = K.identify_powertrain(r["model"], r["trim"], r["fuel"], r["cc"], r["year"])
+    pt = K.identify_powertrain(r["model"], r["trim"], r["fuel"], r["cc"])
     eng = K.ENGINES[pt["engine"]]
     size = K.size_of(r["model"])
     sn = K.SIZE_NOTES[size]
@@ -195,50 +193,21 @@ def evaluate(r: dict, stats: dict) -> dict:
                       f"사려는 사람이 적어 값을 깎이기 쉽습니다. "
                       f"같은 값에 흔한 차가 있으면 흔한 차가 유리합니다.")
 
-    # 8) 안전장치 — 어머님 조건에서 가장 중요한 축 -------------------------
-    adas = r["adas_list"]
-    n_adas, n_park, bags = r["adas_n"] or 0, r["parking_aid_n"] or 0, r["airbags"] or 0
-    if n_adas >= 3:
-        good.append(f"사고를 막아 주는 첨단 안전장치가 {n_adas}가지 있습니다 "
-                    f"({', '.join(adas)})")
-    elif n_adas == 0:
-        caution.append("첨단 안전장치(자동 브레이크·차선 이탈 경고 등)가 확인되지 않습니다")
-        checks.append("이 차는 <b>자동 긴급제동·차선이탈 경고·후측방 경보가 목록에 없습니다.</b> "
-                      "같은 값대에 이런 장치가 있는 차가 많으니, 안전을 우선하신다면 "
-                      "장치가 있는 차를 먼저 보시는 편이 낫습니다. "
-                      "옵션 표기가 빠진 경우도 있으니 차에서 직접 확인하세요.")
-    else:
-        caution.append(f"첨단 안전장치가 {n_adas}가지뿐입니다")
-    for name, why in (
-            ("자동긴급제동", "앞차를 못 봤을 때 차가 스스로 브레이크를 잡아 줍니다. "
-                          "안전장치 중 사고를 가장 많이 줄여 주는 기능입니다"),
-            ("후측방경보", "차선을 바꿀 때 옆·뒤에서 오는 차를 사이드미러에 알려 줍니다"),
-            ("차선이탈경보", "졸음이나 부주의로 차선을 넘으면 경고해 줍니다"),
-            ("스마트크루즈", "앞차와 거리를 자동으로 맞춰 줍니다. 장거리 운전이 훨씬 편합니다")):
-        if name in adas:
-            good.append(f"{name} — {why}")
-    if bags >= 4:
-        good.append(f"에어백이 {bags}종류(운전석·조수석·사이드·커튼) 들어 있습니다")
-    elif bags <= 2:
-        caution.append(f"에어백이 {bags}종류만 확인됩니다")
-
-    # 주차 보조
+    # 8) 옵션 ---------------------------------------------------------------
     if "후방카메라" in r["opt"]:
         good.append("후방카메라가 있습니다")
     else:
         caution.append("후방카메라가 확인되지 않습니다")
         checks.append("후방카메라가 목록에 없습니다. 주차할 때 크게 도움이 되니 실제로 있는지 "
                       "차에서 직접 확인하시고, 없으면 설치 비용(20~40만원)을 감안하세요.")
-    if "어라운드뷰" in r["opt"]:
-        good.append("360도 어라운드뷰가 있어 주차할 때 차 주변이 위에서 보입니다")
-    if n_park >= 3:
-        good.append(f"주차 보조 장치가 {n_park}가지 있습니다")
+    if "후방센서" in r["opt"]:
+        good.append("후방 감지센서(삐 소리)가 있습니다")
     if "열선시트" in r["opt"]:
         good.append("열선시트(엉덩이 따뜻해지는 기능)가 있습니다")
-    if "통풍시트" in r["opt"]:
-        good.append("통풍시트(여름에 시원한 기능)가 있습니다")
     if "스마트키" in r["opt"]:
         good.append("스마트키가 있어 열쇠를 꺼내지 않아도 됩니다")
+    if "후측방경보" in r["opt"]:
+        good.append("후측방 경보가 있어 차선 바꿀 때 사각지대를 알려줍니다")
 
     # 9) 크기 ---------------------------------------------------------------
     if sn["park_level"] == "어려움":
@@ -273,8 +242,6 @@ def evaluate(r: dict, stats: dict) -> dict:
     if size in (K.SIZE_SMALL_SUV, K.SIZE_MID_SUV):
         order -= 1
     order -= min(cnt, 200) / 100        # 흔한 차를 살짝 우대
-    order -= n_adas * 1.2               # 첨단 안전장치를 크게 우대
-    order -= min(n_park, 4) * 0.3
 
     gen = (stats.get("generations") or {}).get(r["model"] or "", {})
     return dict(pt=pt, eng=eng, size=size, size_note=sn, fuel_note=fuel_note,
@@ -291,9 +258,6 @@ def pick(items, pred, n=SECTION_N, exclude=(), one_per_model=True):
     seen: set[str] = set()
     out = []
     for i in items:
-        # 안전을 앞에 두는 페이지이므로 첨단 안전장치가 2가지 미만인 차는 추천하지 않는다.
-        if (i["adas_n"] or 0) < MIN_ADAS_FOR_PICK:
-            continue
         if i["id"] in ex or i["ev"]["warn"] or not pred(i):
             continue
         key = i["model_group"] or i["model"]
@@ -312,12 +276,6 @@ def categories(items):
                and (i["group_basis"] or "").endswith("트림")
                and (i["price_gap"] is None or i["price_gap"] >= 0), n=TOP_PICKS)
     return top, [
-        ("안전장치가 가장 많은 차",
-         "사고를 막아 주는 장치가 가장 많이 달린 차입니다. 자동 긴급제동(앞차를 못 봤을 때 "
-         "차가 스스로 브레이크를 잡는 기능)은 안전장치 중에서도 사고를 가장 많이 줄여 줍니다. "
-         "2020년 이후 차는 이런 장치가 기본으로 들어가는 경우가 많습니다.",
-         pick(items, lambda i: (i["adas_n"] or 0) >= 4 and (i["parking_aid_n"] or 0) >= 3
-              and i["accident"] == "무사고")),
         ("조용하고 기름값이 가장 적게 드는 차",
          "시내와 정체 구간이 많으시면 하이브리드가 가장 편합니다. 저속에서 전기로만 "
          "움직여 소리가 거의 없고, 기름값은 일반 가솔린차의 절반에 가깝습니다.",
@@ -343,9 +301,8 @@ def categories(items):
          pick(items, lambda i: i["ev"]["size"] in (K.SIZE_MID_SUV, K.SIZE_LARGE_SUV),
               exclude=top)),
         ("돈을 가장 아끼는 차",
-         "차값이 낮고 세금·기름값도 적게 드는 차입니다. 대신 <b>안전장치가 위 차들보다 "
-         "적습니다.</b> 값과 안전을 맞바꾸는 선택이니, 위 '안전장치가 가장 많은 차'와 "
-         "나란히 비교해 보고 결정하세요.",
+         "차값이 낮고 세금·기름값도 적게 드는 차입니다. 대신 주행거리가 길 수 있으니 "
+         "확인 항목을 특히 잘 보세요.",
          pick(sorted(items, key=lambda i: i["price"] + (i["ev"]["tax"] or 0) / 10000),
               lambda i: True, exclude=top)),
     ]
@@ -447,28 +404,6 @@ RED_FLAGS = [
     "같은 차·같은 연식보다 값이 <b>유난히 싼데</b> 그 이유를 설명하지 못하는 경우",
     "주행거리가 아주 짧다는데 <b>페달 고무·핸들·시트가 많이 닳아 있는</b> 경우",
     "계약을 <b>오늘 안 하면 안 된다</b>고 재촉하는 경우",
-]
-
-CHANNELS = [
-    ("K카 (케이카) 직영", "https://www.kcar.com/bc/search",
-     "이 페이지가 쓰는 곳입니다. 회사가 직접 사서 진단하고 파는 '직영'이라 "
-     "차량 상태 기준이 일정하고, 일정 기간 책임 환불 제도가 있습니다. "
-     "홈서비스로 집까지 배송도 됩니다.", "수집함", True),
-    ("현대·제네시스 인증중고차", "https://certified.hyundai.com/p/search/vehicle",
-     "<b>안전과 보증만 보면 여기가 가장 낫습니다.</b> 제조사가 직접 정밀 진단하고 "
-     "신차 보증의 남은 기간을 이어 주며, 별도 보증을 더 붙일 수도 있습니다. "
-     "현대·기아·제네시스만 있고 값은 같은 조건에서 다른 곳보다 비쌉니다. "
-     "5년/10만km 이내 차량만 취급합니다.", "수집 못 함(사이트가 자동 조회를 거부)", False),
-    ("기아 인증중고차", "https://www.kia.com/kr/customer-service/certified-used-car",
-     "현대 인증중고차와 같은 구조의 기아 공식 채널입니다. "
-     "제조사 진단·보증이 붙습니다.", "미조사", False),
-    ("엔카 (encar)", "https://www.encar.com/dc/dc_carsearchlist.do",
-     "매물이 가장 많은 곳입니다. 다만 대부분 <b>딜러가 올린 매물</b>이라 "
-     "차량 상태와 응대 품질이 딜러마다 다릅니다. '엔카 진단'이 붙은 매물만 골라 보시고, "
-     "허위·미끼 매물을 걸러야 합니다.", "수집 금지(robots.txt가 매물 데이터를 금지)", False),
-    ("KB차차차", "https://www.kbchachacha.com/public/search/main.kbc",
-     "KB캐피탈이 운영하는 딜러 매물 플랫폼입니다. 엔카와 성격이 비슷하며 "
-     "금융(할부) 조건을 함께 보기 편합니다.", "미수집(목록이 자동 조회로 안 열림)", False),
 ]
 
 LOOKUPS = [
@@ -607,16 +542,10 @@ def card(r: dict, rank: int | None = None) -> str:
     pros = "".join(f"<li>{rich(g)}</li>" for g in ev["good"][:8])
     cons = "".join(f"<li>{rich(c)}</li>" for c in ev["warn"] + ev["caution"])
     checks = "".join(f"<li>{rich(c)}</li>" for c in ev["checks"])
-    basis = r.get("group_basis") or ""
-    if r["price_gap"] is None:
-        gap = f'비교 가능한 차가 {r["group_n"]}대뿐이라 시세 비교 어려움'
-    elif basis.endswith("트림"):
-        gap = (f'같은 차·같은 연식·<b>같은 트림</b> {r["group_n"]}대의 중앙값 '
-               f'{r["group_median_price"]:,.0f}만원 대비 <b>{r["price_gap"]:+.0%}</b>'
-               f'{" (저렴)" if r["price_gap"] > 0 else " (비쌈)" if r["price_gap"] < 0 else ""}')
-    else:
-        gap = (f'<span style="color:#8a5a12">{basis} {r["group_n"]}대 기준으로는 '
-               f'{r["price_gap"]:+.0%}지만, <b>트림이 섞여 있어 이 숫자는 믿을 수 없습니다</b></span>')
+    gap = (f'같은 차·같은 연식 {r["group_n"]}대의 중앙값 {r["group_median_price"]:,.0f}만원 '
+           f'대비 <b>{r["price_gap"]:+.0%}</b>'
+           if r["price_gap"] is not None else
+           f'비교 가능한 차가 {r["group_n"]}대뿐이라 시세 비교 어려움')
     return f"""
 <div class="card">
 <h3>{rk}{h(r['maker'])} {h(r['model'])} {h(r['trim'])}
@@ -630,7 +559,6 @@ def card(r: dict, rank: int | None = None) -> str:
 <li>{h(ev['eng']['name'])}</li>
 <li>{h(ev['pt']['tx'])}</li>
 <li>{h(ev['size'])} · 주차 {h(ev['size_note']['park_level'])} · {h(r['seats'])}인승</li>
-<li>안전장치 <b>{r['adas_n'] or 0}가지</b> · 에어백 {r['airbags'] or 0}종 · 주차보조 {r['parking_aid_n'] or 0}가지</li>
 <li>{h(r['location'])}</li>
 </ul>
 <div class="money">{''.join(money)}</div>
@@ -708,14 +636,6 @@ def build(rows, meta, stats) -> str:
         for name, v in K.FUEL_NOTES.items())
 
     c = meta.get("conditions", {})
-    channels = "".join(
-        f"<h3>{h(n)}{' — 이 페이지가 쓰는 곳' if used else ''}</h3>"
-        f"<p>{rich(d)}</p>"
-        f"<p style='font-size:.88rem;color:#666'>이 정리에서의 상태: <b>{h(st)}</b><br>"
-        f"<a href='{h(u)}' target='_blank' rel='noopener nofollow'>{h(u)}</a></p>"
-        for n, u, d, st, used in CHANNELS)
-    n_adas4 = sum(1 for i in items if (i["adas_n"] or 0) >= 4)
-    n_bag4 = sum(1 for i in items if (i["airbags"] or 0) >= 4)
     return f"""<!doctype html>
 <html lang="ko"><head>
 <meta charset="utf-8">
@@ -729,9 +649,6 @@ def build(rows, meta, stats) -> str:
 <p class="lead">K카(kcar.com) 직영 재고를 <b>한 대도 빼지 않고 전부</b> 훑어
 조건에 맞는 차를 고르고, 차마다 <b>무엇을 확인해야 하는지</b>를 정리했습니다.
 점수로 줄 세우지 않았습니다. 차마다 성격과 걸리는 점이 다르기 때문입니다.</p>
-<p class="lead"><b>2020년 이후 · 5인승 · 안전장치 위주</b>로 다시 골랐습니다.
-2020년 이후 차는 자동 긴급제동·차선이탈 경고 같은 안전장치가 기본으로 들어가는 경우가 많고,
-에어백도 4종류가 표준입니다.</p>
 
 <div class="top">
 <p><b>수집 일시</b> {h(meta.get('collected_at'))} · <b>출처</b> K카(kcar.com) 직영 매물</p>
@@ -740,8 +657,6 @@ def build(rows, meta, stats) -> str:
 조건에 맞는 <b>{meta.get('passed', len(rows)):,}대</b>를 골랐습니다.</p>
 <p><b>5인승만</b> 골랐습니다. 7·9·11인승(카니발 등)과 미니밴, 경차, 화물·승합,
 렌터카 이력, 사고 이력 차는 모두 뺐습니다.</p>
-<p>이 중 <b>첨단 안전장치를 4가지 다 갖춘 차가 {n_adas4}대</b>,
-에어백 4종류를 갖춘 차가 {n_bag4}대입니다.</p>
 <p style="font-size:.88rem">{h(DISCLAIMER)}</p>
 </div>
 
@@ -777,23 +692,6 @@ def build(rows, meta, stats) -> str:
 </ul>
 <p>이 네 가지는 아래 <b>'계약 전에 꼭 조회할 3곳'</b>과 현장에서 직접 확인하셔야 합니다.
 <b>시승과 진단서 확인은 어떤 경우에도 생략하면 안 됩니다.</b></p>
-</div>
-
-<h2>어디서 사는 게 좋은가</h2>
-<p class="lead">중고차는 <b>어디서 사느냐가 차를 고르는 것만큼 중요합니다.</b>
-같은 차라도 파는 곳에 따라 진단 기준, 보증, 환불 조건이 크게 다릅니다.
-아래는 실제로 확인한 내용입니다.</p>
-<div class="box">{channels}</div>
-<div class="box tipbox">
-<p style="margin-top:0"><b>안전을 가장 앞에 두신다면</b> — 값을 조금 더 쓰셔도
-<b>제조사 인증중고차(현대·기아 공식)</b>가 가장 확실합니다. 제조사가 직접 진단하고
-신차 보증 잔여 기간을 이어 주기 때문에, 큰 고장이 났을 때 내 돈이 나가지 않습니다.
-그다음이 <b>K카 같은 직영</b>(회사가 직접 사서 파니 기준이 일정하고 환불 제도가 있음),
-마지막이 <b>딜러 매물 플랫폼</b>(엔카·KB차차차 — 매물은 많지만 딜러마다 다름)입니다.</p>
-<p><b>이 페이지에 실린 차는 전부 K카 직영 매물입니다.</b> 엔카는 사이트 규칙(robots.txt)이
-매물 데이터의 자동 조회를 금지하고 있어 수집하지 않았고, 현대 인증중고차는 규칙상
-허용되지만 사이트가 자동 조회를 거부해 받지 못했습니다. 두 곳은 위 링크로
-직접 보시는 것이 맞습니다.</p>
 </div>
 
 <h2>먼저, 어머님께 맞는 연료부터 고르세요</h2>

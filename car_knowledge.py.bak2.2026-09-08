@@ -49,10 +49,6 @@ ENGINES = {
     "smartstream_16": dict(name="1.6 가솔린", nature="자연흡기", theta2=False),
     "smartstream_20": dict(name="2.0 가솔린", nature="자연흡기", theta2=False),
     "nu_20": dict(name="2.0 자연흡기 가솔린", nature="자연흡기", theta2=False),
-    "smartstream_25": dict(name="2.5 가솔린", nature="자연흡기", theta2=False),
-    "smartstream_20_t": dict(name="2.0 터보 가솔린", nature="터보", theta2=False),
-    "lambda_35": dict(name="3.5 가솔린", nature="자연흡기", theta2=False),
-    "lambda_33_t": dict(name="3.3 터보 가솔린", nature="터보", theta2=False),
     "nu_20_lpi": dict(name="2.0 LPG", nature="자연흡기", theta2=False),
     "theta2_24_gdi": dict(name="2.4 가솔린 직분사(세타2 GDI)", nature="자연흡기", theta2=True),
     "theta2_20_t": dict(name="2.0 터보 가솔린(세타2 T-GDI)", nature="터보", theta2=True),
@@ -79,7 +75,6 @@ SIZE_VAN = "미니밴"
 # 모델(세대)명 → 차급. 부분 문자열로 맞춘다(긴 것부터 검사).
 SIZE_BY_MODEL = [
     ("스토닉", SIZE_SMALL_SUV), ("코나", SIZE_SMALL_SUV), ("베뉴", SIZE_SMALL_SUV),
-    ("셀토스", SIZE_SMALL_SUV),
     ("니로", SIZE_MID_SUV), ("투싼", SIZE_MID_SUV), ("스포티지", SIZE_MID_SUV),
     ("싼타페", SIZE_LARGE_SUV), ("쏘렌토", SIZE_LARGE_SUV), ("모하비", SIZE_LARGE_SUV),
     ("카니발", SIZE_VAN), ("카렌스", SIZE_VAN),
@@ -88,7 +83,6 @@ SIZE_BY_MODEL = [
     ("아이오닉", SIZE_COMPACT), ("K3", SIZE_COMPACT),
     ("쏘나타", SIZE_MID_SEDAN), ("K5", SIZE_MID_SEDAN),
     ("그랜저", SIZE_LARGE_SEDAN), ("K7", SIZE_LARGE_SEDAN), ("G80", SIZE_LARGE_SEDAN),
-    ("K8", SIZE_LARGE_SEDAN), ("스팅어", SIZE_LARGE_SEDAN), ("G70", SIZE_MID_SEDAN),
 ]
 
 # 차급별 어머님 관점 설명 (승하차 / 주차)
@@ -131,14 +125,6 @@ MODEL_CHARACTER = {
               "값이 싸서 같은 돈으로 주행거리가 짧은 차를 고를 수 있습니다.",
     "코나": "스토닉과 비슷한 크기의 현대 소형 SUV입니다. 옵션이 더 좋은 편입니다.",
     "베뉴": "현대의 가장 작은 SUV입니다. 혼자 또는 둘이 타고 근거리를 다니기에 알맞습니다.",
-    "셀토스": "기아의 소형 SUV입니다. 같은 급에서 실내가 가장 넉넉하고 천장이 높아 "
-              "타고 내리기 편합니다. 2019년에 나온 비교적 새 차종입니다.",
-    "K8": "K7의 후속인 준대형 세단입니다. 2021년에 나온 새 차종이라 안전장치가 "
-          "기본으로 많이 들어갑니다. 다만 차가 크고 세금·기름값이 많이 듭니다.",
-    "스팅어": "기아의 고성능 세단입니다. 힘이 좋지만 승차감이 단단하고 기름값이 많이 들어 "
-             "일상용으로는 권하지 않습니다.",
-    "G70": "제네시스의 중형 세단입니다. 조용하고 잘 만들었지만 뒷좌석이 좁고 "
-           "수리비가 국산 대중차보다 비쌉니다.",
     "니로": "기아의 하이브리드 전용 SUV입니다. 기름값이 가장 적게 들고 조용합니다.",
     "투싼": "현대의 준중형 SUV입니다. 실내가 넉넉하고 시야가 좋습니다.",
     "스포티지": "기아의 준중형 SUV입니다. 투싼과 형제차입니다.",
@@ -255,80 +241,16 @@ def annual_fuel_cost(engine_key: str, fuel: str, annual_km: int = ANNUAL_KM) -> 
     return int(round(annual_km / kmpl * price, -3))
 
 
-# ── 엔진/변속기 판별 ────────────────────────────────────────────────────────
-# 배기량(engdispmnt)은 목록 응답의 실측값이라 트림 문자열보다 신뢰할 수 있다.
-# 그래서 배기량을 1차 근거로 쓰고, 터보 여부만 트림 문자열에서 읽는다.
-
-# 건식 DCT를 쓰는 차급. 현대·기아는 소형·준중형에 7단 건식 DCT를 얹고,
-# 중형 이상(쏘나타·K5·그랜저·K8·싼타페·쏘렌토·제네시스)에는 토크컨버터 자동을 쓴다.
-# 확신하는 범위만 DCT로 표시하고, 나머지는 '일반 자동변속기'로 둔다.
-DCT_MODEL_HINTS = ["스토닉", "코나", "베뉴", "셀토스", "투싼", "스포티지", "니로",
-                   "아반떼", "i30", "벨로스터", "K3", "쏘울", "프라이드", "엑센트"]
-# 자연흡기 소형 가솔린에 무단변속기(IVT)를 쓰는 차종
-IVT_MODEL_HINTS = ["아반떼", "K3", "베뉴", "셀토스", "코나"]
-
-# 세타2 GDI: 2.4 GDI(2359cc) / 2.0 T-GDI(1998cc). 2020년을 끝으로 스마트스트림으로
-# 교체됐으므로 연식 상한을 둔다. 이 조건에서만 리콜 안내를 띄운다.
-THETA2_MODELS = ["그랜저", "쏘나타", "K5", "K7", "투싼", "스포티지", "쏘렌토", "싼타페"]
-
-
-def _gasoline_na_engine(cc: int | None) -> str:
-    if not cc:
-        return "gamma_16_gdi"
-    if cc <= 1250:
-        return "kappa_14_mpi"
-    if cc <= 1500:
-        return "kappa_14_mpi"
-    if cc <= 1750:
-        return "gamma_16_gdi"
-    if cc <= 2150:
-        return "nu_20"
-    if cc <= 2700:
-        return "smartstream_25"
-    if cc <= 3400:
-        return "lambda_30_33"
-    return "lambda_35"
-
-
-def _gasoline_turbo_engine(cc: int | None) -> str:
-    if not cc:
-        return "gamma_16_t"
-    if cc <= 1100:
-        return "kappa_10_t"
-    if cc <= 1450:
-        return "gamma_14_t"
-    if cc <= 1750:
-        return "gamma_16_t"
-    if cc <= 2150:
-        return "smartstream_20_t"
-    return "lambda_33_t"
-
-
-def _diesel_engine(cc: int | None) -> str:
-    if not cc:
-        return "u2_16_dsl"
-    if cc <= 1620:
-        return "u2_16_dsl"
-    if cc <= 1780:
-        return "u_17_dsl"
-    if cc <= 2050:
-        return "r_20_dsl"
-    if cc <= 2400:
-        return "r_22_dsl"
-    return "s2_30_dsl"
-
-
-def identify_powertrain(model: str, trim: str, fuel: str, cc: int | None,
-                        year: int | None = None) -> dict:
+# ── 트림 문자열 → 엔진/변속기 판별 ──────────────────────────────────────────
+def identify_powertrain(model: str, trim: str, fuel: str, cc: int | None) -> dict:
     """모델·트림·연료·배기량으로 엔진과 변속기를 판정한다.
 
     확실하지 않으면 보수적으로 일반 분류를 반환한다(과잉 단정 금지).
     """
     t = f"{model} {trim}"
     m = model
-    turbo = ("터보" in t) or ("T-GDI" in t) or ("TGDI" in t)
-    small = any(hint in m for hint in DCT_MODEL_HINTS)
 
+    # 하이브리드 먼저
     if fuel == "하이브리드":
         if any(k in m for k in ("니로", "아이오닉")):
             return dict(engine="hev_kappa_16", tx=TX_DCT_HEV)
@@ -338,32 +260,47 @@ def identify_powertrain(model: str, trim: str, fuel: str, cc: int | None,
         return dict(engine="nu_20_lpi", tx=TX_AUTO)
 
     if fuel == "디젤":
-        eng = _diesel_engine(cc)
-        # 1.6/1.7 디젤은 소형·준중형에서 건식 DCT 조합이 많다. 2.0 이상은 토크컨버터.
-        tx = TX_DCT_DRY if (eng in ("u2_16_dsl", "u_17_dsl") and small) else TX_AUTO
-        return dict(engine=eng, tx=tx)
+        if "3.0" in t:
+            return dict(engine="s2_30_dsl", tx=TX_AUTO)
+        if "2.2" in t or "카니발" in m or "모하비" in m:
+            return dict(engine="r_22_dsl", tx=TX_AUTO)
+        if "2.0" in t:
+            return dict(engine="r_20_dsl", tx=TX_AUTO)      # R2.0 + 토크컨버터 자동
+        if "1.7" in t:
+            return dict(engine="u_17_dsl", tx=TX_DCT_DRY)
+        # 1.6 디젤(U2)은 건식 DCT 조합이 많다
+        return dict(engine="u2_16_dsl", tx=TX_DCT_DRY)
 
     # 가솔린
-    if turbo:
-        eng = _gasoline_turbo_engine(cc)
-        # 세타2 2.0 T-GDI (1998cc, 2020년 이전)
-        if (cc and 1980 <= cc <= 2010 and year and year <= 2020
-                and any(k in m for k in THETA2_MODELS)):
-            return dict(engine="theta2_20_t", tx=TX_AUTO)
-        tx = TX_DCT_DRY if (small and eng in ("kappa_10_t", "gamma_14_t", "gamma_16_t")) else TX_AUTO
-        return dict(engine=eng, tx=tx)
-
-    # 세타2 2.4 GDI (2359cc, 2020년 이전)
-    if (cc and 2340 <= cc <= 2380 and year and year <= 2020
-            and any(k in m for k in THETA2_MODELS)):
+    if "카니발" in m or "모하비" in m:                        # 카니발 가솔린 = 3.3
+        return dict(engine="lambda_30_33", tx=TX_AUTO)
+    if "3.3" in t or "3.0" in t or "G80" in m:
+        return dict(engine="lambda_30_33", tx=TX_AUTO)
+    # 세타2: 2.4 GDI, 그리고 쏘나타/K5 계열의 2.0 터보
+    if "2.4" in t or "HG240" in t:
         return dict(engine="theta2_24_gdi", tx=TX_AUTO)
-
-    eng = _gasoline_na_engine(cc)
-    # 자연흡기 1.6 이하 + IVT 채택 차종 → 무단변속기
-    if eng in ("gamma_16_gdi", "smartstream_16", "kappa_14_mpi") and any(
-            hint in m for hint in IVT_MODEL_HINTS):
-        return dict(engine="smartstream_16" if eng == "gamma_16_gdi" else eng, tx=TX_IVT)
-    return dict(engine=eng, tx=TX_AUTO)
+    if "2.0 터보" in t and any(k in m for k in ("쏘나타", "K5")):
+        return dict(engine="theta2_20_t", tx=TX_AUTO)
+    if "1.6 터보" in t or "1.6 T-GDI" in t:
+        return dict(engine="gamma_16_t", tx=TX_DCT_DRY)
+    if "1.4 터보" in t:
+        return dict(engine="gamma_14_t", tx=TX_DCT_DRY)
+    if "1.0 터보" in t:
+        return dict(engine="kappa_10_t", tx=TX_DCT_DRY)
+    if "1.4" in t:                                           # 스토닉 1.4, 엑센트 1.4
+        return dict(engine="kappa_14_mpi", tx=TX_AUTO)
+    if "쏘나타 DN8" in m:
+        return dict(engine="smartstream_20", tx=TX_AUTO)
+    if "올 뉴 K3" in m or "K3 2세대" in m or "베뉴" in m or "더 뉴 K3" == m:
+        return dict(engine="smartstream_16", tx=TX_IVT)
+    if "2.0" in t or (cc and 1900 <= cc <= 2100):
+        return dict(engine="nu_20", tx=TX_AUTO)
+    if "1.6" in t or (cc and 1500 <= cc <= 1700):
+        return dict(engine="gamma_16_gdi", tx=TX_AUTO)
+    # 판정 실패: 배기량으로만 대략 분류
+    if cc and cc >= 2300:
+        return dict(engine="lambda_30_33", tx=TX_AUTO)
+    return dict(engine="gamma_16_gdi", tx=TX_AUTO)
 
 
 def size_of(model: str) -> str:

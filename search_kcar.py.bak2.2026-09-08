@@ -83,24 +83,10 @@ HATCHBACK_HINTS = ["i30", "벨로스터", "K3 GT", "프라이드", "아이오닉
 KEICAR_HINTS = ["모닝", "레이", "캐스퍼", "스파크", "마티즈", "다마스", "라보"]
 ACCIDENT_OK = {"무사고", "단순수리"}
 OPTION_PATTERNS = {
-    # 주차·후방 시야
     "후방카메라": ["카메라 : 후방"],
     "전방카메라": ["카메라 : 전방"],
-    "어라운드뷰": ["어라운드"],
     "후방센서": ["감지센서 : 후방"],
     "전방센서": ["감지센서 : 전방"],
-    # 첨단 안전(ADAS)
-    "자동긴급제동": ["자동긴급제동"],
-    "후측방경보": ["후측방"],
-    "차선이탈경보": ["LDWS", "차선이탈"],
-    "스마트크루즈": ["스마트 크루즈"],
-    "헤드업디스플레이": ["헤드업"],
-    # 기본 안전
-    "타이어공기압경고": ["TPMS", "타이어공기압"],
-    "차체자세제어": ["차체자세"],
-    "경사로밀림방지": ["경사로밀림"],
-    "전자식파킹브레이크": ["전자식파킹"],
-    # 편의
     "통풍시트": ["통풍시트"],
     "열선시트": ["열선시트"],
     "열선핸들": ["열선 : 스티어링"],
@@ -108,17 +94,12 @@ OPTION_PATTERNS = {
     "내비": ["내비게이션"],
     "크루즈": ["크루즈컨트롤"],
     "선루프": ["선루프", "썬루프"],
+    "후측방경보": ["후측방"],
+    "차선이탈경보": ["LDWS", "차선이탈"],
+    "자동긴급제동": ["자동긴급제동"],
     "전동시트": ["전동시트"],
     "하이패스": ["하이패스"],
-    "무선충전": ["무선충전"],
 }
-
-# 첨단 안전장치 — 있으면 사고 자체를 줄여 주는 것들. 안전 판단의 핵심 축이다.
-ADAS_OPTIONS = ["자동긴급제동", "차선이탈경보", "후측방경보", "스마트크루즈"]
-# 주차·저속 사고를 줄여 주는 것들
-PARKING_AIDS = ["후방카메라", "후방센서", "전방센서", "어라운드뷰", "전방카메라"]
-AIRBAG_KINDS = ["운전석", "조수석", "사이드", "커튼", "무릎", "동승석"]
-
 # 총 구매비용 추정: 상세 페이지(Disallow)에 있는 K카 표시값을 쓸 수 없어 추정만 한다.
 ACQUISITION_TAX_RATE = 0.07   # 승용 중고차 취득세
 TRANSFER_FEE_MANWON = 3.0     # 매도비·이전대행 추정
@@ -280,12 +261,6 @@ def options_of(row: dict) -> list[str]:
     return [label for label, pats in OPTION_PATTERNS.items() if any(p in raw for p in pats)]
 
 
-def airbag_count(row: dict) -> int:
-    """'에어백 : 운전석' 처럼 종류별로 표기되므로 종류 수를 센다."""
-    raw = row.get("optnNm") or ""
-    return sum(1 for kind in AIRBAG_KINDS if f"에어백 : {kind}" in raw)
-
-
 def normalize(row: dict) -> dict:
     car_cd = row.get("carCd")
     mfg = str(row.get("mfgDt") or "")
@@ -320,10 +295,6 @@ def normalize(row: dict) -> dict:
         "insurance_history": None,   # 상세 페이지 Disallow → 미수집
         "owner_changes": None,       # 상세 페이지 Disallow → 미수집
         "options": "|".join(options_of(row)),
-        "airbags": airbag_count(row),
-        "adas": "|".join(o for o in options_of(row) if o in ADAS_OPTIONS),
-        "adas_n": sum(1 for o in options_of(row) if o in ADAS_OPTIONS),
-        "parking_aid_n": sum(1 for o in options_of(row) if o in PARKING_AIDS),
         "location": " ".join(x for x in [row.get("cntrNm"), row.get("cntrRgnNm")] if x),
         "listed_date": None,         # 상세 페이지 Disallow → 미수집
         "warranty": None,            # 상세 페이지 Disallow → 미수집
@@ -506,8 +477,7 @@ CSV_FIELDS = ["id", "url", "maker", "model", "model_group", "full_name", "trim",
               "grade_name", "year_month", "year", "model_year", "km", "price", "total_cost",
               "total_cost_est", "fuel", "fuel_raw", "transmission", "cc", "seats",
               "body_type", "category_raw", "accident", "insurance_history", "owner_changes",
-              "options", "airbags", "adas", "adas_n", "parking_aid_n",
-              "location", "listed_date", "warranty", "photo",
+              "options", "location", "listed_date", "warranty", "photo",
               "use_tag", "rent_reg", "reg_type", "group_key", "group_n",
               "group_median_price", "group_median_km", "price_gap", "km_gap",
               "group_basis", "group_note", "score"]
@@ -530,11 +500,11 @@ def write_csv(items: list[dict], path: str, collected_at: str, total_cnt: int,
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="K카 직영 전체 재고 수집·시세 비교·후보 선별")
-    ap.add_argument("--budget", type=int, default=2200, help="차량가 상한(만원)")
-    ap.add_argument("--total-budget", type=int, default=2400,
+    ap.add_argument("--budget", type=int, default=1300, help="차량가 상한(만원)")
+    ap.add_argument("--total-budget", type=int, default=1400,
                     help="총 구매비용 상한(만원, 추정치 기준)")
-    ap.add_argument("--year", type=int, default=2020, help="연식 하한")
-    ap.add_argument("--km", type=int, default=100000, help="주행거리 상한")
+    ap.add_argument("--year", type=int, default=2017, help="연식 하한")
+    ap.add_argument("--km", type=int, default=120000, help="주행거리 상한")
     ap.add_argument("--seats", type=int, default=5, help="좌석 수 (기본 5인승)")
     ap.add_argument("--fuel", default="gasoline,hybrid,lpg,diesel",
                     help="허용 연료 (gasoline,hybrid,lpg,diesel)")
