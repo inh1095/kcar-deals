@@ -8,7 +8,8 @@
    이므로 조회하지 않는다. 대신 허용된 목록 API에 `wr_in_car_cd`로 **차량 단건 조회**를
    새로 보내 대조한다(페이지네이션 캐시가 아닌 독립 요청이므로 파싱·수집 오류를 잡아낸다).
    사람이 눈으로 볼 상세 페이지 URL도 함께 출력한다.
-2. docs/index.html 을 HTML 파서로 열어 표 행 수가 CSV와 일치하는지 확인한다.
+2. docs/all.html 의 표 행 수가 CSV와 일치하는지 HTML 파서로 확인하고,
+   docs/index.html(어머님용 가이드)의 사이트 규칙을 함께 검사한다.
 3. 사이트 규칙(noindex, 사진 없음, 외부 스크립트·폰트 없음)을 검사한다.
 4. 시세 그룹 이상치(트림 혼재·비교 불가)를 집계한다.
 """
@@ -26,7 +27,8 @@ from search_kcar import (DETAIL_URL, MIN_GROUP_SIZE, make_session, post_list,
                          Blocked, fetch_robots, robots_allows, LIST_PAGE)
 
 CSV_PATH = "data/listings.csv"
-HTML_PATH = "docs/index.html"
+HTML_PATH = "docs/all.html"
+GUIDE_PATH = "docs/index.html"
 SAMPLE = 3
 SEED = 20260908
 
@@ -117,7 +119,7 @@ def main() -> None:
 
     print()
     print("=" * 78)
-    print("2) docs/index.html 표 행 수 대조 + 사이트 규칙 검사")
+    print("2) docs/all.html (분석용 전체 표) 행 수 대조 + 사이트 규칙 검사")
     print("=" * 78)
     scan = Scan()
     scan.feed(open(HTML_PATH, encoding="utf-8").read())
@@ -145,6 +147,36 @@ def main() -> None:
     passed = "img.kcar.com" not in body
     ok &= passed
     print(f"  {'OK  ' if passed else 'FAIL'} 사진 URL(img.kcar.com) 미게시")
+
+    print()
+    print("=" * 78)
+    print("2-2) docs/index.html (어머님용 가이드) 검사")
+    print("=" * 78)
+    gscan = Scan()
+    gbody = open(GUIDE_PATH, encoding="utf-8").read()
+    gscan.feed(gbody)
+    guide_rules = [
+        ("noindex,nofollow 메타", gscan.robots_meta == "noindex,nofollow", gscan.robots_meta),
+        ("사진(img 태그) 없음", gscan.imgs == 0, f"{gscan.imgs}개"),
+        ("외부 스크립트 없음", not gscan.ext_scripts, gscan.ext_scripts),
+        ("외부 폰트·CSS 없음", not gscan.ext_links, gscan.ext_links),
+        ("사진 URL 미게시", "img.kcar.com" not in gbody, "-"),
+        ("출처·수집일시 표기", "수집 일시" in gbody and "kcar.com" in gbody, "-"),
+        ("면책 문구", "상업적 이용 금지" in gbody, "-"),
+        ("미수집 필드 한계 명시", "보험 수리 이력" in gbody, "-"),
+        ("리콜 조회 안내", "car.go.kr" in gbody, "-"),
+        ("점수 미표시(숫자 줄세우기 없음)", "점수" not in gbody.split("<footer>")[0]
+         or "점수로 줄 세우지" in gbody, "-"),
+    ]
+    for label, passed, detail in guide_rules:
+        ok &= passed
+        print(f"  {'OK  ' if passed else 'FAIL'} {label}: {detail}")
+    # 태그 균형: html.parser 가 끝까지 파싱했고 body/main 이 닫혔는지
+    for tag in ("</main>", "</body>", "</html>"):
+        passed = tag in gbody
+        ok &= passed
+        print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
+    print(f"       참고: 가이드 내 표 {dict(gscan.rows)}")
 
     print()
     print("=" * 78)

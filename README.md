@@ -46,3 +46,17 @@ python3.11 build_report.py
 
 개인 검토용 비공식 분석입니다. 출처는 K카이며 가격·매물 상태는 수시로 바뀝니다.
 구매 판단은 매물 페이지에서 직접 확인하세요. 상업적 이용 금지.
+
+## 페이지 두 개
+
+| 페이지 | 용도 |
+|---|---|
+| `docs/index.html` | **어머님용 고르기 안내.** 점수로 줄 세우지 않고, 차종마다 엔진·변속기·연료·주행거리를 따져 "무엇을 확인해야 하는지"를 문장으로 보여준다. 현장 체크리스트(인쇄 가능) 포함. `build_guide.py` 가 생성 |
+| `docs/all.html` | 분석용 전체 표. 점수·시세차 기준 정렬·검색. `build_report.py` 가 생성 |
+
+```bash
+python3.11 build_guide.py    # docs/index.html (어머님용 안내)
+python3.11 build_report.py   # docs/report.md + docs/all.html (분석용)
+```
+
+차종 지식(엔진 판별, 차급, 연비·세금, 확인 항목 문구)은 `car_knowledge.py` 에 모여 있다.

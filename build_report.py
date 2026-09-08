@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""data/listings.csv → docs/report.md + docs/index.html.
+"""data/listings.csv → docs/report.md + docs/all.html (분석용 전체 표).
 
 LLM 없이 단독 실행된다. "왜 좋은지"·"가서 확인할 것" 문구도 전부 규칙 기반이다.
 
@@ -470,7 +470,7 @@ def main() -> None:
     rows, meta = load(args.csv)
     os.makedirs(args.outdir, exist_ok=True)
     md_path = os.path.join(args.outdir, "report.md")
-    html_path = os.path.join(args.outdir, "index.html")
+    html_path = os.path.join(args.outdir, "all.html")
     with open(md_path, "w", encoding="utf-8") as fh:
         fh.write(build_md(rows, meta))
     with open(html_path, "w", encoding="utf-8") as fh:
