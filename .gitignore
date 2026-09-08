@@ -1,0 +1,7 @@
+# 원본 수집물은 리포에 올리지 않는다(재게시 범위 최소화). 정리본 data/listings.csv 만 추적
+data/raw/
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+*.bak.*
