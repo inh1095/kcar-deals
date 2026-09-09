@@ -472,11 +472,15 @@ def add_trim_rank(items: list[dict], pool: list[dict]) -> None:
 # ── 시장 통계 (웹검색 대신 전체 재고에서 직접 뽑는 관점) ────────────────────
 def market_stats(market: list[dict], pool: list[dict]) -> dict:
     """모델별 재고 수와 연식별 시세. 재고가 많은 차 = 부품·정비·재판매가 쉬운 차."""
+    # 차종(model_group) 재고는 **순수 전기차를 제외하고** 센다.
+    # 예: '아이오닉' 으로 묶으면 아이오닉 5·6(E-GMP 전기차, 부품이 전혀 다름)이 섞여
+    # 아이오닉 하이브리드가 실제보다 흔한 차로 보인다(65대 vs 실제 하이브리드 10대).
+    non_ev = [m for m in pool if (m["fuel_raw"] or "") != "전기"]
     by_model: dict[str, list[dict]] = {}
-    for m in pool:
+    for m in non_ev:
         if m["model_group"]:
             by_model.setdefault(m["model_group"], []).append(m)
-    total = len(pool)
+    total = len(non_ev)
     stats = {}
     for name, cars in by_model.items():
         years = {}
@@ -508,7 +512,8 @@ def market_stats(market: list[dict], pool: list[dict]) -> dict:
         g["year_counts"] = {str(y): len(p) for y, p in sorted(g["by_year"].items())}
         del g["by_year"]
 
-    return {"total_comparable": total, "total_collected": len(market),
+    return {"total_comparable": total, "total_comparable_all": len(pool),
+            "total_collected": len(market),
             "models": stats, "model_count": len(stats),
             "generations": gens, "generation_count": len(gens)}
 

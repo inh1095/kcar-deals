@@ -1,21 +1,22 @@
 {
-  "total_comparable": 6842,
+  "total_comparable": 6632,
+  "total_comparable_all": 6842,
   "total_collected": 7408,
   "models": {
     "제네시스": {
       "count": 41,
-      "share": 0.00599,
+      "share": 0.00618,
       "median_price_by_year": {
         "2013": 875.0,
         "2014": 1120.0,
         "2015": 1100.0,
         "2016": 1100
       },
-      "rank": 40
+      "rank": 39
     },
     "투싼": {
       "count": 163,
-      "share": 0.02382,
+      "share": 0.02458,
       "median_price_by_year": {
         "2013": 805.0,
         "2014": 845.0,
@@ -35,17 +36,17 @@
     },
     "에쿠스": {
       "count": 17,
-      "share": 0.00248,
+      "share": 0.00256,
       "median_price_by_year": {
         "2013": 1145.0,
         "2014": 1250,
         "2015": 1240
       },
-      "rank": 65
+      "rank": 63
     },
     "그랜저": {
       "count": 574,
-      "share": 0.08389,
+      "share": 0.08655,
       "median_price_by_year": {
         "2011": 645.0,
         "2012": 530.0,
@@ -67,7 +68,7 @@
     },
     "아반떼": {
       "count": 180,
-      "share": 0.02631,
+      "share": 0.02714,
       "median_price_by_year": {
         "2011": 520,
         "2012": 535.0,
@@ -88,16 +89,16 @@
     },
     "엑센트": {
       "count": 8,
-      "share": 0.00117,
+      "share": 0.00121,
       "median_price_by_year": {
         "2014": 520.0,
         "2015": 575.0
       },
-      "rank": 84
+      "rank": 82
     },
     "싼타페": {
       "count": 329,
-      "share": 0.04809,
+      "share": 0.04961,
       "median_price_by_year": {
         "2012": 855.0,
         "2013": 930.0,
@@ -118,7 +119,7 @@
     },
     "맥스크루즈": {
       "count": 27,
-      "share": 0.00395,
+      "share": 0.00407,
       "median_price_by_year": {
         "2013": 1130.0,
         "2015": 1310.0,
@@ -126,70 +127,64 @@
         "2017": 1670.0,
         "2018": 1705.0
       },
-      "rank": 50
+      "rank": 47
     },
     "아슬란": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2015": 905.0
       },
-      "rank": 109
+      "rank": 105
     },
     "아이오닉": {
-      "count": 65,
-      "share": 0.0095,
+      "count": 10,
+      "share": 0.00151,
       "median_price_by_year": {
         "2016": 1050,
-        "2017": 1250.0,
-        "2018": 1360,
-        "2019": 1470.0,
-        "2020": 1680,
-        "2021": 2790,
-        "2022": 3170,
-        "2023": 3220,
-        "2024": 3850
+        "2018": 1395.0,
+        "2019": 1610
       },
-      "rank": 30
+      "rank": 76
     },
     "i30": {
       "count": 12,
-      "share": 0.00175,
+      "share": 0.00181,
       "median_price_by_year": {
         "2017": 1150,
         "2018": 1135.0
       },
-      "rank": 75
+      "rank": 72
     },
     "코나": {
-      "count": 93,
-      "share": 0.01359,
+      "count": 82,
+      "share": 0.01236,
       "median_price_by_year": {
         "2017": 1170,
-        "2018": 1170,
-        "2019": 1445.0,
-        "2020": 1730.0,
+        "2018": 1140.0,
+        "2019": 1390,
+        "2020": 1565.0,
         "2021": 1870,
-        "2023": 2620,
+        "2023": 2595.0,
         "2024": 2735.0,
-        "2025": 2850.0
+        "2025": 2700.0
       },
-      "rank": 22
+      "rank": 23
     },
     "벨로스터": {
       "count": 17,
-      "share": 0.00248,
+      "share": 0.00256,
       "median_price_by_year": {
         "2018": 1175.0,
         "2019": 1230.0,
         "2020": 1890,
         "2021": 1990
       },
-      "rank": 66
+      "rank": 64
     },
     "팰리세이드": {
       "count": 180,
-      "share": 0.02631,
+      "share": 0.02714,
       "median_price_by_year": {
         "2019": 2150,
         "2020": 2190,
@@ -202,23 +197,23 @@
     },
     "넥쏘": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {},
-      "rank": 118
+      "rank": 114
     },
     "베뉴": {
       "count": 8,
-      "share": 0.00117,
+      "share": 0.00121,
       "median_price_by_year": {
         "2019": 1190,
         "2021": 1595.0,
         "2022": 1695.0
       },
-      "rank": 85
+      "rank": 83
     },
     "3시리즈": {
       "count": 32,
-      "share": 0.00468,
+      "share": 0.00483,
       "median_price_by_year": {
         "2014": 1250,
         "2015": 950,
@@ -229,22 +224,22 @@
         "2021": 2760,
         "2022": 2860
       },
-      "rank": 46
+      "rank": 44
     },
     "A6": {
       "count": 19,
-      "share": 0.00278,
+      "share": 0.00286,
       "median_price_by_year": {
         "2018": 1880.0,
         "2020": 2570,
         "2021": 2880.0,
         "2022": 3190.0
       },
-      "rank": 58
+      "rank": 56
     },
     "쏘나타": {
       "count": 277,
-      "share": 0.04049,
+      "share": 0.04177,
       "median_price_by_year": {
         "2010": 640.0,
         "2012": 550,
@@ -262,11 +257,11 @@
         "2024": 2850.0,
         "2025": 2990
       },
-      "rank": 6
+      "rank": 5
     },
     "XM3": {
       "count": 52,
-      "share": 0.0076,
+      "share": 0.00784,
       "median_price_by_year": {
         "2020": 1190.0,
         "2021": 1340.0,
@@ -274,23 +269,22 @@
         "2023": 1530.0,
         "2024": 2105.0
       },
-      "rank": 35
+      "rank": 34
     },
     "봉고III 트럭": {
-      "count": 30,
-      "share": 0.00438,
+      "count": 22,
+      "share": 0.00332,
       "median_price_by_year": {
-        "2021": 1880,
-        "2022": 1780,
-        "2023": 2290.0,
-        "2024": 1945.0,
+        "2021": 1355.0,
+        "2022": 1485.0,
+        "2024": 1920,
         "2025": 1900.0
       },
-      "rank": 48
+      "rank": 51
     },
     "K8": {
       "count": 106,
-      "share": 0.01549,
+      "share": 0.01598,
       "median_price_by_year": {
         "2021": 2260,
         "2022": 2430.0,
@@ -301,18 +295,18 @@
       "rank": 21
     },
     "토레스": {
-      "count": 59,
-      "share": 0.00862,
+      "count": 58,
+      "share": 0.00875,
       "median_price_by_year": {
         "2022": 1920,
         "2023": 2105.0,
-        "2024": 2220.0
+        "2024": 2160
       },
-      "rank": 33
+      "rank": 32
     },
     "SM6": {
       "count": 55,
-      "share": 0.00804,
+      "share": 0.00829,
       "median_price_by_year": {
         "2016": 720,
         "2017": 795.0,
@@ -323,11 +317,11 @@
         "2022": 1635.0,
         "2025": 2090.0
       },
-      "rank": 34
+      "rank": 33
     },
     "5시리즈": {
       "count": 43,
-      "share": 0.00628,
+      "share": 0.00648,
       "median_price_by_year": {
         "2016": 1810.0,
         "2017": 2480,
@@ -337,11 +331,11 @@
         "2022": 3720,
         "2023": 5070
       },
-      "rank": 39
+      "rank": 38
     },
     "G70": {
       "count": 92,
-      "share": 0.01345,
+      "share": 0.01387,
       "median_price_by_year": {
         "2017": 1685.0,
         "2018": 1890.0,
@@ -350,11 +344,11 @@
         "2021": 2890,
         "2022": 3190
       },
-      "rank": 23
+      "rank": 22
     },
     "레이": {
-      "count": 288,
-      "share": 0.04209,
+      "count": 273,
+      "share": 0.04116,
       "median_price_by_year": {
         "2012": 715.0,
         "2013": 725.0,
@@ -367,32 +361,32 @@
         "2020": 1030,
         "2021": 1255.0,
         "2022": 1400.0,
-        "2023": 1640,
-        "2024": 1770,
-        "2025": 1720
+        "2023": 1635.0,
+        "2024": 1690,
+        "2025": 1690
       },
-      "rank": 4
+      "rank": 7
     },
     "아테온": {
       "count": 10,
-      "share": 0.00146,
+      "share": 0.00151,
       "median_price_by_year": {
         "2022": 2590,
         "2023": 2760.0
       },
-      "rank": 79
+      "rank": 77
     },
     "SM5": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2015": 620.0
       },
-      "rank": 110
+      "rank": 106
     },
     "모닝": {
       "count": 195,
-      "share": 0.0285,
+      "share": 0.0294,
       "median_price_by_year": {
         "2011": 545.0,
         "2012": 490,
@@ -414,15 +408,15 @@
     },
     "프리우스": {
       "count": 10,
-      "share": 0.00146,
+      "share": 0.00151,
       "median_price_by_year": {
         "2024": 3400
       },
-      "rank": 80
+      "rank": 78
     },
     "K5": {
       "count": 160,
-      "share": 0.02338,
+      "share": 0.02413,
       "median_price_by_year": {
         "2010": 550.0,
         "2011": 665.0,
@@ -442,37 +436,27 @@
       },
       "rank": 12
     },
-    "EV3": {
-      "count": 14,
-      "share": 0.00205,
-      "median_price_by_year": {
-        "2024": 3860.0,
-        "2025": 4030.0
-      },
-      "rank": 70
-    },
     "체로키": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {},
-      "rank": 89
+      "rank": 87
     },
     "포터": {
-      "count": 35,
-      "share": 0.00512,
+      "count": 26,
+      "share": 0.00392,
       "median_price_by_year": {
         "2020": 1480,
-        "2021": 1910,
-        "2022": 1875.0,
-        "2023": 1950,
+        "2022": 1815.0,
+        "2023": 1905.0,
         "2024": 1850,
         "2025": 1985.0
       },
-      "rank": 44
+      "rank": 48
     },
     "스타렉스": {
       "count": 67,
-      "share": 0.00979,
+      "share": 0.0101,
       "median_price_by_year": {
         "2017": 1230,
         "2018": 1450,
@@ -480,22 +464,22 @@
         "2020": 1675.0,
         "2021": 1630
       },
-      "rank": 29
+      "rank": 28
     },
     "클럽맨": {
       "count": 21,
-      "share": 0.00307,
+      "share": 0.00317,
       "median_price_by_year": {
         "2016": 1085.0,
         "2019": 1290,
         "2020": 1685.0,
         "2023": 2705.0
       },
-      "rank": 55
+      "rank": 53
     },
     "1시리즈": {
       "count": 18,
-      "share": 0.00263,
+      "share": 0.00271,
       "median_price_by_year": {
         "2015": 1150,
         "2021": 2375.0,
@@ -503,22 +487,22 @@
         "2023": 2680,
         "2024": 2770.0
       },
-      "rank": 61
+      "rank": 59
     },
     "트레일블레이저": {
       "count": 21,
-      "share": 0.00307,
+      "share": 0.00317,
       "median_price_by_year": {
         "2020": 1395.0,
         "2021": 1410.0,
         "2022": 2155.0,
         "2023": 2090
       },
-      "rank": 56
+      "rank": 54
     },
     "쿠퍼": {
       "count": 30,
-      "share": 0.00438,
+      "share": 0.00452,
       "median_price_by_year": {
         "2018": 1210.0,
         "2019": 1570,
@@ -527,11 +511,11 @@
         "2023": 2390,
         "2024": 2565.0
       },
-      "rank": 49
+      "rank": 46
     },
     "렉스턴": {
       "count": 138,
-      "share": 0.02017,
+      "share": 0.02081,
       "median_price_by_year": {
         "2018": 1470.0,
         "2019": 1580.0,
@@ -546,7 +530,7 @@
     },
     "GV80": {
       "count": 153,
-      "share": 0.02236,
+      "share": 0.02307,
       "median_price_by_year": {
         "2020": 3710.0,
         "2021": 3950,
@@ -558,35 +542,35 @@
     },
     "레니게이드": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {
         "2020": 1330.0,
         "2022": 1930.0
       },
-      "rank": 90
+      "rank": 88
     },
     "2시리즈": {
       "count": 14,
-      "share": 0.00205,
+      "share": 0.00211,
       "median_price_by_year": {
         "2017": 1100.0,
         "2018": 1220,
         "2023": 2990
       },
-      "rank": 71
+      "rank": 68
     },
     "A-클래스": {
       "count": 12,
-      "share": 0.00175,
+      "share": 0.00181,
       "median_price_by_year": {
         "2020": 1950,
         "2021": 1935.0
       },
-      "rank": 76
+      "rank": 73
     },
     "스팅어": {
       "count": 41,
-      "share": 0.00599,
+      "share": 0.00618,
       "median_price_by_year": {
         "2017": 1565.0,
         "2018": 1570,
@@ -595,11 +579,11 @@
         "2021": 2450,
         "2022": 2425.0
       },
-      "rank": 41
+      "rank": 40
     },
     "스타리아": {
       "count": 25,
-      "share": 0.00365,
+      "share": 0.00377,
       "median_price_by_year": {
         "2021": 2875.0,
         "2022": 2300.0,
@@ -607,24 +591,23 @@
         "2024": 2715.0,
         "2025": 2850
       },
-      "rank": 53
+      "rank": 50
     },
     "캐스퍼": {
-      "count": 126,
-      "share": 0.01842,
+      "count": 109,
+      "share": 0.01644,
       "median_price_by_year": {
         "2021": 1495.0,
         "2022": 1580,
         "2023": 1560,
-        "2024": 2120.0,
-        "2025": 2715.0,
-        "2026": 2810.0
+        "2024": 1720,
+        "2025": 2080.0
       },
-      "rank": 19
+      "rank": 20
     },
     "모하비": {
       "count": 76,
-      "share": 0.01111,
+      "share": 0.01146,
       "median_price_by_year": {
         "2012": 1040,
         "2014": 1155.0,
@@ -637,11 +620,11 @@
         "2021": 2690,
         "2022": 2930
       },
-      "rank": 28
+      "rank": 27
     },
     "쏘렌토": {
       "count": 274,
-      "share": 0.04005,
+      "share": 0.04131,
       "median_price_by_year": {
         "2013": 790,
         "2014": 930.0,
@@ -657,11 +640,11 @@
         "2024": 4050,
         "2025": 4030
       },
-      "rank": 7
+      "rank": 6
     },
     "스포티지": {
       "count": 145,
-      "share": 0.02119,
+      "share": 0.02186,
       "median_price_by_year": {
         "2010": 675.0,
         "2013": 720,
@@ -682,7 +665,7 @@
     },
     "K7": {
       "count": 142,
-      "share": 0.02075,
+      "share": 0.02141,
       "median_price_by_year": {
         "2015": 800,
         "2016": 1090,
@@ -696,7 +679,7 @@
     },
     "쏘울": {
       "count": 33,
-      "share": 0.00482,
+      "share": 0.00498,
       "median_price_by_year": {
         "2014": 830.0,
         "2016": 970,
@@ -705,11 +688,11 @@
         "2019": 1330,
         "2020": 1425.0
       },
-      "rank": 45
+      "rank": 43
     },
     "카니발": {
       "count": 288,
-      "share": 0.04209,
+      "share": 0.04343,
       "median_price_by_year": {
         "2014": 915.0,
         "2015": 1150.0,
@@ -724,19 +707,19 @@
         "2024": 4020,
         "2025": 4550
       },
-      "rank": 5
+      "rank": 4
     },
     "프라이드": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {
         "2015": 535.0
       },
-      "rank": 91
+      "rank": 89
     },
     "K9": {
       "count": 49,
-      "share": 0.00716,
+      "share": 0.00739,
       "median_price_by_year": {
         "2016": 1400.0,
         "2017": 1475.0,
@@ -747,11 +730,11 @@
         "2022": 3590,
         "2023": 3890
       },
-      "rank": 37
+      "rank": 36
     },
     "K3": {
       "count": 78,
-      "share": 0.0114,
+      "share": 0.01176,
       "median_price_by_year": {
         "2012": 645.0,
         "2013": 590,
@@ -766,45 +749,44 @@
         "2023": 1685.0,
         "2024": 1890
       },
-      "rank": 25
+      "rank": 24
     },
     "니로": {
-      "count": 86,
-      "share": 0.01257,
+      "count": 64,
+      "share": 0.00965,
       "median_price_by_year": {
         "2016": 1100,
         "2017": 1185.0,
-        "2018": 1290,
-        "2019": 1520.0,
-        "2020": 1805.0,
-        "2021": 2050.0,
-        "2022": 1900.0,
-        "2023": 2700
+        "2018": 1290.0,
+        "2019": 1425.0,
+        "2020": 1750,
+        "2021": 1870.0,
+        "2022": 1900.0
       },
-      "rank": 24
+      "rank": 29
     },
     "카렌스": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2018": 1235.0
       },
-      "rank": 111
+      "rank": 107
     },
     "스토닉": {
       "count": 51,
-      "share": 0.00745,
+      "share": 0.00769,
       "median_price_by_year": {
         "2017": 855.0,
         "2018": 975.0,
         "2019": 1150,
         "2020": 1220.0
       },
-      "rank": 36
+      "rank": 35
     },
     "셀토스": {
       "count": 77,
-      "share": 0.01125,
+      "share": 0.01161,
       "median_price_by_year": {
         "2019": 1730.0,
         "2020": 1565.0,
@@ -814,21 +796,11 @@
         "2024": 2520,
         "2025": 2540
       },
-      "rank": 26
-    },
-    "EV6": {
-      "count": 27,
-      "share": 0.00395,
-      "median_price_by_year": {
-        "2021": 3130,
-        "2022": 3070,
-        "2023": 3440.0
-      },
-      "rank": 51
+      "rank": 25
     },
     "올란도": {
       "count": 19,
-      "share": 0.00278,
+      "share": 0.00286,
       "median_price_by_year": {
         "2013": 670.0,
         "2014": 700.0,
@@ -836,20 +808,20 @@
         "2016": 730.0,
         "2017": 750.0
       },
-      "rank": 59
+      "rank": 57
     },
     "크루즈": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {
         "2014": 430.0,
         "2016": 495.0
       },
-      "rank": 92
+      "rank": 90
     },
     "스파크": {
       "count": 77,
-      "share": 0.01125,
+      "share": 0.01161,
       "median_price_by_year": {
         "2013": 380.0,
         "2014": 380.0,
@@ -862,19 +834,19 @@
         "2021": 820,
         "2022": 1000
       },
-      "rank": 27
+      "rank": 26
     },
     "캡티바": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2015": 650
       },
-      "rank": 119
+      "rank": 115
     },
     "트랙스": {
       "count": 63,
-      "share": 0.00921,
+      "share": 0.0095,
       "median_price_by_year": {
         "2014": 590,
         "2015": 610,
@@ -889,47 +861,39 @@
         "2025": 2250,
         "2026": 1890
       },
-      "rank": 31
+      "rank": 30
     },
     "임팔라": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {
         "2016": 800.0
       },
-      "rank": 134
-    },
-    "볼트 EV": {
-      "count": 3,
-      "share": 0.00044,
-      "median_price_by_year": {
-        "2019": 1745.0
-      },
-      "rank": 120
+      "rank": 127
     },
     "이쿼녹스": {
       "count": 13,
-      "share": 0.0019,
+      "share": 0.00196,
       "median_price_by_year": {
         "2019": 1080,
         "2020": 1210,
         "2022": 1935.0
       },
-      "rank": 73
+      "rank": 70
     },
     "트래버스": {
       "count": 14,
-      "share": 0.00205,
+      "share": 0.00211,
       "median_price_by_year": {
         "2020": 1980,
         "2021": 1979.5,
         "2022": 2785.0
       },
-      "rank": 72
+      "rank": 69
     },
     "코란도": {
-      "count": 63,
-      "share": 0.00921,
+      "count": 62,
+      "share": 0.00935,
       "median_price_by_year": {
         "2014": 850,
         "2015": 750,
@@ -939,14 +903,14 @@
         "2019": 1140.0,
         "2020": 1350,
         "2021": 1450.0,
-        "2022": 1555.0,
+        "2022": 1530,
         "2023": 1555.0
       },
-      "rank": 32
+      "rank": 31
     },
     "티볼리": {
       "count": 127,
-      "share": 0.01856,
+      "share": 0.01915,
       "median_price_by_year": {
         "2015": 820,
         "2016": 780,
@@ -964,61 +928,61 @@
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 147
+      "rank": 140
     },
     "볼트(Volt)": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 148
+      "rank": 141
     },
     "콜로라도": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2021": 2080
       },
-      "rank": 102
+      "rank": 98
     },
     "QM3": {
       "count": 21,
-      "share": 0.00307,
+      "share": 0.00317,
       "median_price_by_year": {
         "2014": 545.0,
         "2015": 635.0,
         "2016": 620,
         "2017": 730
       },
-      "rank": 57
+      "rank": 55
     },
     "QM5": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {
         "2015": 630.0
       },
-      "rank": 135
+      "rank": 128
     },
     "SM3": {
       "count": 16,
-      "share": 0.00234,
+      "share": 0.00241,
       "median_price_by_year": {
         "2015": 490,
         "2016": 490
       },
-      "rank": 67
+      "rank": 65
     },
     "SM7": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2015": 700.0
       },
-      "rank": 103
+      "rank": 99
     },
     "QM6": {
       "count": 156,
-      "share": 0.0228,
+      "share": 0.02352,
       "median_price_by_year": {
         "2016": 1030,
         "2017": 1060.0,
@@ -1034,40 +998,34 @@
     },
     "클리오": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2018": 715.0,
         "2019": 760.0
       },
-      "rank": 112
+      "rank": 108
     },
     "캡처": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2021": 1250
       },
-      "rank": 121
-    },
-    "조에": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 149
+      "rank": 116
     },
     "EQ900": {
       "count": 26,
-      "share": 0.0038,
+      "share": 0.00392,
       "median_price_by_year": {
         "2016": 2030,
         "2017": 1885.0,
         "2018": 2205.0
       },
-      "rank": 52
+      "rank": 49
     },
     "G80": {
       "count": 298,
-      "share": 0.04355,
+      "share": 0.04493,
       "median_price_by_year": {
         "2016": 1500.0,
         "2017": 1690,
@@ -1084,7 +1042,7 @@
     },
     "G90": {
       "count": 39,
-      "share": 0.0057,
+      "share": 0.00588,
       "median_price_by_year": {
         "2019": 3090,
         "2020": 3230.0,
@@ -1092,11 +1050,11 @@
         "2022": 5510,
         "2023": 5765.0
       },
-      "rank": 42
+      "rank": 41
     },
     "GV70": {
       "count": 123,
-      "share": 0.01798,
+      "share": 0.01855,
       "median_price_by_year": {
         "2021": 3450,
         "2022": 4025.0,
@@ -1104,92 +1062,78 @@
         "2024": 4940.0,
         "2025": 4990
       },
-      "rank": 20
+      "rank": 19
     },
     "X5": {
       "count": 6,
-      "share": 0.00088,
+      "share": 0.0009,
       "median_price_by_year": {
         "2016": 2720.0,
         "2017": 2760
       },
-      "rank": 96
+      "rank": 93
     },
     "7시리즈": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2016": 3290.0
       },
-      "rank": 113
+      "rank": 109
     },
     "X2": {
       "count": 10,
-      "share": 0.00146,
+      "share": 0.00151,
       "median_price_by_year": {
         "2019": 2105.0,
         "2021": 2460.0
       },
-      "rank": 81
-    },
-    "볼트 EUV": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 150
+      "rank": 79
     },
     "Q7": {
       "count": 11,
-      "share": 0.00161,
+      "share": 0.00166,
       "median_price_by_year": {
         "2019": 2805.0
       },
-      "rank": 77
-    },
-    "GV60": {
-      "count": 3,
-      "share": 0.00044,
-      "median_price_by_year": {
-        "2023": 4755.0
-      },
-      "rank": 122
+      "rank": 74
     },
     "X6": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2021": 5470.0
       },
-      "rank": 123
+      "rank": 117
     },
     "4시리즈": {
       "count": 8,
-      "share": 0.00117,
+      "share": 0.00121,
       "median_price_by_year": {
         "2017": 2430,
         "2019": 1855.0
       },
-      "rank": 86
+      "rank": 84
     },
     "S-클래스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 151
+      "rank": 142
     },
     "GLA-클래스": {
       "count": 18,
-      "share": 0.00263,
+      "share": 0.00271,
       "median_price_by_year": {
         "2017": 1500,
         "2019": 1880,
         "2021": 2780
       },
-      "rank": 62
+      "rank": 60
     },
     "GLC-클래스": {
       "count": 22,
-      "share": 0.00322,
+      "share": 0.00332,
       "median_price_by_year": {
         "2016": 2205.0,
         "2017": 2590,
@@ -1197,227 +1141,212 @@
         "2019": 2690.0,
         "2020": 2900
       },
-      "rank": 54
+      "rank": 52
     },
     "SLC-클래스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 152
+      "rank": 143
     },
     "GLB-클래스": {
       "count": 16,
-      "share": 0.00234,
+      "share": 0.00241,
       "median_price_by_year": {
         "2020": 2795.0,
         "2021": 3055.0,
         "2022": 3385.0,
         "2023": 4100.0
       },
-      "rank": 68
+      "rank": 66
     },
     "티구안": {
       "count": 9,
-      "share": 0.00132,
+      "share": 0.00136,
       "median_price_by_year": {
         "2018": 1950,
         "2020": 2210.0
       },
-      "rank": 82
+      "rank": 80
     },
     "투아렉": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2023": 5300
       },
-      "rank": 114
+      "rank": 110
     },
     "마칸": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 153
+      "rank": 144
     },
     "V40": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {
         "2019": 1415.0
       },
-      "rank": 136
+      "rank": 129
     },
     "XC60": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {
         "2021": 3350
       },
-      "rank": 93
+      "rank": 91
     },
     "XC40": {
       "count": 9,
-      "share": 0.00132,
+      "share": 0.00136,
       "median_price_by_year": {
         "2022": 2850.0,
         "2024": 3810.0,
         "2025": 4165.0
       },
-      "rank": 83
+      "rank": 81
     },
     "V60": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2021": 2725.0
       },
-      "rank": 104
+      "rank": 100
     },
     "디스커버리 스포츠": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 154
+      "rank": 145
     },
     "익스플로러": {
       "count": 18,
-      "share": 0.00263,
+      "share": 0.00271,
       "median_price_by_year": {
         "2019": 1955.0,
         "2020": 2170,
         "2021": 2555.0,
         "2022": 2785.0
       },
-      "rank": 63
+      "rank": 61
     },
     "파일럿": {
       "count": 6,
-      "share": 0.00088,
+      "share": 0.0009,
       "median_price_by_year": {
         "2019": 2640
       },
-      "rank": 97
+      "rank": 94
     },
     "CR-V": {
       "count": 8,
-      "share": 0.00117,
+      "share": 0.00121,
       "median_price_by_year": {
         "2016": 1750.0,
         "2022": 3130.0
       },
-      "rank": 87
+      "rank": 85
     },
     "오딧세이": {
       "count": 8,
-      "share": 0.00117,
+      "share": 0.00121,
       "median_price_by_year": {
         "2022": 3480
       },
-      "rank": 88
+      "rank": 86
     },
     "시에나": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 137
+      "rank": 130
     },
     "패스파인더": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 155
+      "rank": 146
     },
     "UX": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 156
+      "rank": 147
     },
     "MKC": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 138
+      "rank": 131
     },
     "코세어": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2021": 2290,
         "2022": 2865.0
       },
-      "rank": 105
+      "rank": 101
     },
     "쿠퍼 컨버터블": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2022": 2585.0
       },
-      "rank": 115
+      "rank": 111
     },
     "컨트리맨": {
       "count": 6,
-      "share": 0.00088,
+      "share": 0.0009,
       "median_price_by_year": {
         "2020": 1835.0,
         "2021": 2290.0
       },
-      "rank": 98
+      "rank": 95
     },
     "QX60": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2016": 1335.0
       },
-      "rank": 124
-    },
-    "모델 3": {
-      "count": 7,
-      "share": 0.00102,
-      "median_price_by_year": {
-        "2020": 3800,
-        "2021": 3690.0
-      },
-      "rank": 94
-    },
-    "폴스타 2": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 157
+      "rank": 118
     },
     "A3": {
       "count": 19,
-      "share": 0.00278,
+      "share": 0.00286,
       "median_price_by_year": {
         "2018": 1190,
         "2022": 2280,
         "2023": 2560
       },
-      "rank": 60
+      "rank": 58
     },
     "C-클래스": {
       "count": 18,
-      "share": 0.00263,
+      "share": 0.00271,
       "median_price_by_year": {
         "2016": 1545.0,
         "2017": 1390.0,
         "2019": 1860.0,
         "2021": 2785.0
       },
-      "rank": 64
+      "rank": 62
     },
     "컴패스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 158
+      "rank": 148
     },
     "말리부": {
       "count": 36,
-      "share": 0.00526,
+      "share": 0.00543,
       "median_price_by_year": {
         "2014": 640.0,
         "2015": 555.0,
@@ -1428,37 +1357,37 @@
         "2020": 1280.0,
         "2022": 1570
       },
-      "rank": 43
+      "rank": 42
     },
     "필랑트": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2026": 4250
       },
-      "rank": 125
+      "rank": 119
     },
     "아르카나 ": {
       "count": 15,
-      "share": 0.00219,
+      "share": 0.00226,
       "median_price_by_year": {
         "2024": 2070.0,
         "2025": 1970
       },
-      "rank": 69
+      "rank": 67
     },
     "그랑 콜레오스": {
       "count": 32,
-      "share": 0.00468,
+      "share": 0.00483,
       "median_price_by_year": {
         "2024": 3420.0,
         "2025": 3380
       },
-      "rank": 47
+      "rank": 45
     },
     "E-클래스": {
       "count": 47,
-      "share": 0.00687,
+      "share": 0.00709,
       "median_price_by_year": {
         "2015": 1485.0,
         "2016": 1720,
@@ -1470,69 +1399,61 @@
         "2023": 4590.0,
         "2024": 5415.0
       },
-      "rank": 38
+      "rank": 37
     },
     "다마스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 159
+      "rank": 149
     },
     "i40": {
       "count": 6,
-      "share": 0.00088,
+      "share": 0.0009,
       "median_price_by_year": {
         "2016": 1030
       },
-      "rank": 99
+      "rank": 96
     },
     "A5": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2019": 2135.0
       },
-      "rank": 106
+      "rank": 102
     },
     "골프": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2016": 1190
       },
-      "rank": 126
+      "rank": 120
     },
     "B-클래스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 160
-    },
-    "Q4 e-트론": {
-      "count": 3,
-      "share": 0.00044,
-      "median_price_by_year": {
-        "2023": 4070.0
-      },
-      "rank": 127
+      "rank": 150
     },
     "Q30": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 161
+      "rank": 151
     },
     "A4": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2021": 2385.0
       },
-      "rank": 107
+      "rank": 103
     },
     "그란투리스모 (GT)": {
       "count": 13,
-      "share": 0.0019,
+      "share": 0.00196,
       "median_price_by_year": {
         "2015": 1990.0,
         "2017": 2175.0,
@@ -1540,349 +1461,310 @@
         "2021": 4050.0,
         "2022": 4450.0
       },
-      "rank": 74
+      "rank": 71
     },
     "Q5": {
       "count": 5,
-      "share": 0.00073,
+      "share": 0.00075,
       "median_price_by_year": {
         "2021": 3240.0
       },
-      "rank": 108
+      "rank": 104
     },
     "X4": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 162
+      "rank": 152
     },
     "X3": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2021": 3430
       },
-      "rank": 116
+      "rank": 112
     },
     "GLE-클래스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 163
+      "rank": 153
     },
     "GLS-클래스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 164
+      "rank": 154
     },
     "S90": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {},
-      "rank": 128
+      "rank": 121
     },
     "레인지로버 이보크": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 139
+      "rank": 132
     },
     "300C": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 165
+      "rank": 155
     },
     "HR-V": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 166
+      "rank": 156
     },
     "RX": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 167
+      "rank": 157
     },
     "CT6": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 140
+      "rank": 133
     },
     "MKX": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 141
+      "rank": 134
     },
     "랭글러": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2021": 3800.0
       },
-      "rank": 129
-    },
-    "모델 Y": {
-      "count": 6,
-      "share": 0.00088,
-      "median_price_by_year": {
-        "2023": 3900,
-        "2024": 4220.0
-      },
-      "rank": 100
+      "rank": 122
     },
     "Q8": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 168
+      "rank": 158
     },
     "A7": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 169
+      "rank": 159
     },
     "X4M": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 170
+      "rank": 160
     },
     "카이엔": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 171
+      "rank": 161
     },
     "XC90": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2022": 5360.0
       },
-      "rank": 130
+      "rank": 123
     },
     "RAV4": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 142
+      "rank": 135
     },
     "NX": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 172
+      "rank": 162
     },
     "Q70": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 173
+      "rank": 163
     },
     "QX30": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 174
-    },
-    "모델 X": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 175
+      "rank": 164
     },
     "아틀라스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 176
+      "rank": 165
     },
     "캠리": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 177
+      "rank": 166
     },
     "알티마": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 178
+      "rank": 167
     },
     "어코드": {
       "count": 7,
-      "share": 0.00102,
+      "share": 0.00106,
       "median_price_by_year": {
         "2017": 1460.0,
         "2019": 1675.0
       },
-      "rank": 95
+      "rank": 92
     },
     "액티언": {
       "count": 11,
-      "share": 0.00161,
+      "share": 0.00166,
       "median_price_by_year": {
         "2024": 2605.0,
         "2025": 3380,
         "2026": 3465.0
       },
-      "rank": 78
+      "rank": 75
     },
     "무쏘": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 179
+      "rank": 168
     },
     "쥬크": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 180
+      "rank": 169
     },
     "노틸러스": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 181
+      "rank": 170
     },
     "에비에이터": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 182
-    },
-    "아토 3": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 183
+      "rank": 171
     },
     "파사트": {
       "count": 6,
-      "share": 0.00088,
+      "share": 0.0009,
       "median_price_by_year": {
         "2021": 2045.0,
         "2022": 2290
       },
-      "rank": 101
-    },
-    "EX30": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 184
+      "rank": 97
     },
     "508": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 143
+      "rank": 136
     },
     "머스탱": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 185
+      "rank": 172
     },
     "308": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 186
+      "rank": 173
     },
     "제타": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {},
-      "rank": 131
+      "rank": 124
     },
     "3008": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {
         "2022": 2140.0
       },
-      "rank": 144
+      "rank": 137
     },
     "ES": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {},
-      "rank": 132
+      "rank": 125
     },
     "레인지로버 벨라": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 187
+      "rank": 174
     },
     "CLS-클래스": {
       "count": 4,
-      "share": 0.00058,
+      "share": 0.0006,
       "median_price_by_year": {
         "2019": 3580.0
       },
-      "rank": 117
-    },
-    "2008": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 188
+      "rank": 113
     },
     "CLA-클래스": {
       "count": 3,
-      "share": 0.00044,
+      "share": 0.00045,
       "median_price_by_year": {
         "2017": 1555.0
       },
-      "rank": 133
+      "rank": 126
     },
     "CT5": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 145
+      "rank": 138
     },
     "Q50": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 189
-    },
-    "ID": {
-      "count": 1,
-      "share": 0.00015,
-      "median_price_by_year": {},
-      "rank": 190
+      "rank": 175
     },
     "Q3": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 191
+      "rank": 176
     },
     "X1": {
       "count": 2,
-      "share": 0.00029,
+      "share": 0.0003,
       "median_price_by_year": {},
-      "rank": 146
+      "rank": 139
     },
     "S60": {
       "count": 1,
       "share": 0.00015,
       "median_price_by_year": {},
-      "rank": 192
+      "rank": 177
     }
   },
-  "model_count": 192,
+  "model_count": 177,
   "generations": {
     "제네시스": {
       "count": 4,

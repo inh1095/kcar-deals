@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 """data/listings.csv + market_stats.json → docs/index.html (어머님용 고르기 안내)
 
-기준을 탭으로 나눠 직접 고르실 수 있게 만든다.
+두 가지 기준을 탭으로 나눠 직접 고르실 수 있게 만든다.
 
-  가성비           — 10년 총지출(차값 + 유지비×10)이 가장 적은 차
-  가심비           — 매일 체감하는 장비·안전이 가장 많고 값도 과하지 않은 차
-  하이브리드 가성비  — 위 가성비 기준을 하이브리드 안에서만
-  하이브리드 가심비  — 위 가심비 기준을 하이브리드 안에서만
-  전체 비교        — 조건 통과 전부
+  찐가성비 — 10년 동안 실제로 나가는 돈(차값 + 유지비×10)이 가장 적은 차
+  가심비   — 매일 체감하는 장비·안전이 가장 많고, 그 값이 과하지 않은 차
 
 '다시 팔지 않고 오래 탄다'는 전제이므로 감가는 순위에 쓰지 않는다(참고로만 표시).
-하이브리드는 물량이 적어 연식 하한을 한 해 낮춘다(본문에 명시).
 
     python3.11 build_guide.py
 
@@ -29,26 +25,20 @@ import car_knowledge as K
 
 # ── 기준 상수 (여기만 고치면 순위가 바뀐다) ─────────────────────────────────
 TOP_N = 3                    # 각 탭에 카드로 보여줄 대수
-ANNUAL_KM = K.ANNUAL_KM
+ANNUAL_KM = K.ANNUAL_KM      # 연간 주행 가정 (유지비 계산용)
 HOLD_YEARS = 10              # 오래 탈 기간 가정
-
-MAIN_YEAR = 2020             # 일반 탭 연식 하한
-HYBRID_YEAR = 2019           # 하이브리드 탭 연식 하한(물량이 적어 한 해 완화)
 
 # 매일 체감하는 장비. 전 차량에 다 있는 항목(후방센서·열선시트 등)은 구분이 안 되므로 뺀다.
 PREMIUM_FEEL = ["통풍시트", "전동시트", "무선충전", "어라운드뷰",
                 "헤드업디스플레이", "선루프", "스마트크루즈", "뒷좌석열선"]
 
-MIN_ADAS = 2                 # 추천 공통 안전 하한
-MIN_EQUIP = 10               # 추천 공통 장비 하한
+MIN_ADAS = 2                 # 두 탭 공통 안전 하한
+MIN_EQUIP = 10               # 두 탭 공통 장비 하한
 GASIMBI_RUN_CAP = 2_500_000  # 가심비 탭의 연 유지비 상한(원) — '값도 적당' 조건
 
-COMMON_STRONG = 100
+COMMON_STRONG = 100          # 재고 이 이상이면 아주 흔한 차
 COMMON_OK = 30
 RARE = 15
-
-# 어머님이 직접 보내주신 매물(있으면 전용 칸에 따로 보여준다)
-MOTHER_PICK = "EC61399954"
 
 DISCLAIMER = ("개인이 참고용으로 만든 비공식 정리입니다. 가격과 매물 상태는 수시로 바뀌고 "
               "차는 팔리면 사라집니다. 실제 구매 결정은 반드시 매물 페이지와 현장에서 "
@@ -87,6 +77,7 @@ def load(csv_path="data/listings.csv"):
 
 # ── 매물 평가 ────────────────────────────────────────────────────────────────
 def evaluate(r: dict, stats: dict) -> dict:
+    """확인할 점·좋은 점과 두 기준의 숫자를 만든다."""
     pt = K.identify_powertrain(r["model"], r["trim"], r["fuel"], r["cc"], r["year"])
     eng = K.ENGINES[pt["engine"]]
     size = K.size_of(r["model"])
@@ -100,17 +91,17 @@ def evaluate(r: dict, stats: dict) -> dict:
 
     # 돈 ---------------------------------------------------------------------
     tax = K.car_tax(r["cc"], r["year"]) or 0
-    fuel_cost = K.annual_fuel_cost(pt["engine"], r["fuel"], model=r["model"]) or 0
-    running = tax + fuel_cost
+    fuel_cost = K.annual_fuel_cost(pt["engine"], r["fuel"]) or 0
+    running = tax + fuel_cost                        # 연 유지비(감가 제외)
     run_hold = running * HOLD_YEARS
-    total_hold = r["price"] * 10000 + run_hold
+    total_hold = r["price"] * 10000 + run_hold       # 찐가성비 지표
     gen_stats = (stats.get("generations") or {}).get(r["model"] or "")
     dep3, dep_basis = K.forward_depreciation(r["price"], r["year"], gen_stats)
 
     # 만족 요소 --------------------------------------------------------------
     feel = [o for o in PREMIUM_FEEL if o in r["opt"]]
     n_adas = r["adas_n"] or 0
-    sat = len(feel) + n_adas
+    sat = len(feel) + n_adas                         # 0~12, 가심비 지표
     won_per_sat = total_hold / sat if sat else None
 
     # 엔진 ------------------------------------------------------------------
@@ -175,7 +166,7 @@ def evaluate(r: dict, stats: dict) -> dict:
     if pg is not None and not exact:
         caution.append("같은 트림 비교 대상이 적어 시세차를 신뢰할 수 없습니다")
         checks.append(f"이 차와 트림이 똑같은 차가 3대도 없어 {basis}(으)로 넓혀 "
-                      f"비교했습니다. 트림이 섞여 <b>이 시세차는 믿을 수 없습니다.</b> "
+                      f"비교했습니다. 윗급 트림이 섞여 <b>실제보다 싸 보일 수 있습니다.</b> "
                       f"K카 페이지에서 같은 트림끼리 직접 비교해 보세요.")
         pg = None
     elif pg is None:
@@ -192,9 +183,6 @@ def evaluate(r: dict, stats: dict) -> dict:
     mstat = (stats.get("models") or {}).get(r["model_group"] or "", {})
     cnt, rank = mstat.get("count", 0), mstat.get("rank")
     nmodels = stats.get("model_count", 0)
-    # 세대(model) 재고 — 부품을 가장 직접적으로 공유하는 단위.
-    # 차종(model_group) 재고는 세대가 섞여 있어 이 값과 따로 본다.
-    gen_cnt = ((stats.get("generations") or {}).get(r["model"] or "", {}) or {}).get("count", 0)
     if cnt >= COMMON_STRONG:
         good.append(f"K카 직영 재고에 {cnt}대나 있는 아주 흔한 차입니다 "
                     f"(차종 {nmodels}종 중 {rank}위) — 부품 구하기 쉽고 어느 정비소나 "
@@ -203,16 +191,9 @@ def evaluate(r: dict, stats: dict) -> dict:
         good.append(f"재고 {cnt}대로 흔한 편입니다 — 부품·정비에 무리가 없습니다")
     elif cnt < RARE:
         caution.append(f"재고가 {cnt}대뿐인 드문 차입니다")
-        checks.append(f"이 차는 K카 직영 재고 전체에서 {cnt}대뿐입니다"
-                      f"(차종 {nmodels}종 중 {rank}위). 드문 차는 특정 부품을 주문해야 할 수 "
-                      f"있고 동네 정비소가 안 만져 봤을 수 있습니다. "
+        checks.append(f"이 차는 재고 전체에서 {cnt}대뿐입니다. 드문 차는 특정 부품을 "
+                      f"주문해야 할 수 있고 동네 정비소가 안 만져 봤을 수 있습니다. "
                       f"오래 타실 거라면 이 점이 특히 중요합니다.")
-
-    if gen_cnt and gen_cnt < 12 and cnt >= RARE:
-        caution.append(f"이 세대(‘{r['model']}’)는 재고가 {gen_cnt}대뿐입니다")
-        checks.append(f"차종 전체로는 흔하지만 <b>이 세대는 재고가 {gen_cnt}대뿐</b>입니다. "
-                      f"세대가 다르면 부품이 달라지는 경우가 많으니, 오래 타실 거라면 "
-                      f"같은 값대에 더 흔한 세대가 있는지 함께 보세요.")
 
     # 안전 ------------------------------------------------------------------
     if n_adas >= 3:
@@ -220,11 +201,6 @@ def evaluate(r: dict, stats: dict) -> dict:
                     f"({', '.join(r['adas_list'])})")
     elif n_adas == 0:
         caution.append("첨단 안전장치가 확인되지 않습니다")
-    if "자동긴급제동" not in r["adas_list"]:
-        caution.append("자동 긴급제동(앞차 추돌 방지)이 확인되지 않습니다")
-        checks.append("<b>자동 긴급제동이 옵션 목록에 없습니다.</b> 안전장치 중 사고를 가장 "
-                      "많이 줄여 주는 기능이라, 같은 값대에 이 기능이 있는 차와 꼭 비교해 "
-                      "보세요. 표기가 빠진 경우도 있으니 차에서 직접 확인하세요.")
     for name, why in (
             ("자동긴급제동", "앞차를 못 봤을 때 차가 스스로 브레이크를 잡아 줍니다"),
             ("후측방경보", "차선을 바꿀 때 옆·뒤 차를 사이드미러에 알려 줍니다"),
@@ -292,18 +268,18 @@ def evaluate(r: dict, stats: dict) -> dict:
                 tax=tax, fuel_cost=fuel_cost, running=running, run_hold=run_hold,
                 total_hold=total_hold, dep3=dep3, dep_basis=dep_basis,
                 feel=feel, sat=sat, won_per_sat=won_per_sat,
-                eq_ratio=eq_ratio, stock=cnt, rank=rank, gen_stock=gen_cnt)
+                eq_ratio=eq_ratio, stock=cnt, rank=rank)
 
 
-# ── 순위 기준 ────────────────────────────────────────────────────────────────
+# ── 두 기준 ──────────────────────────────────────────────────────────────────
 def eligible(i: dict) -> bool:
-    """추천 공통 하한 — 안전·장비가 너무 적거나 경고가 있는 차는 추천에서 뺀다."""
+    """두 탭 공통 하한 — 안전·장비가 너무 적거나 경고가 있는 차는 추천에서 뺀다."""
     return ((i["adas_n"] or 0) >= MIN_ADAS and (i["equip_n"] or 0) >= MIN_EQUIP
             and i["ev"]["grade"] != "주의" and not i["ev"]["warn"])
 
 
 def rank_value(items):
-    """가성비 — 10년 총지출이 적은 순."""
+    """찐가성비 — 10년 총지출(차값 + 유지비×10)이 적은 순."""
     return sorted([i for i in items if eligible(i)], key=lambda i: i["ev"]["total_hold"])
 
 
@@ -314,6 +290,7 @@ def rank_satisfaction(items):
 
 
 def pick_diverse(ranked, n=TOP_N):
+    """같은 차종이 반복되지 않게 상위 n대."""
     out, seen = [], set()
     for i in ranked:
         key = i["model_group"] or i["model"]
@@ -355,19 +332,6 @@ LOOKUPS = [
      "보험 수리 이력, 침수·전손 여부, 소유자 변경 횟수를 조회합니다. 약 2,200원입니다."),
     ("자동차민원 대국민포털", "https://www.ecar.go.kr/",
      "자동차 등록 원부로 용도(자가용/영업용) 이력을 봅니다."),
-]
-
-HYBRID_CHECKS = [
-    "<b>고전압 배터리 보증이 얼마나 남았는지</b>를 차대번호로 확인한다. 이게 하이브리드에서 "
-    "가장 중요하다. 보증이 남아 있으면 배터리는 걱정하지 않아도 된다.",
-    "시동을 걸고 <b>전기로만 조용히 움직이는지</b> 확인한다. 저속에서 엔진이 계속 돌면 "
-    "배터리 상태를 의심한다.",
-    "계기판의 <b>배터리 충전 표시가 정상 범위에서 오르내리는지</b> 본다. "
-    "한쪽에 붙어 움직이지 않으면 물어본다.",
-    "12V 보조배터리도 따로 있다. 수명이 다하면 시동이 안 걸리므로 교체 시기를 물어본다.",
-    "브레이크는 회생제동을 쓰므로 일반차보다 패드가 덜 닳는다. "
-    "<b>주행거리가 많아도 브레이크가 멀쩡한 것은 정상</b>이다.",
-    "하이브리드는 정체 구간에서 가장 유리하다. <b>시내 위주로 다니시면 최고의 선택</b>이다.",
 ]
 
 FIELD_CHECKLIST = [
@@ -475,37 +439,29 @@ p{margin:.7em 0}
 .box{background:#fff;border:1px solid #e0ddd6;border-radius:12px;padding:18px 20px;margin:16px 0}
 .warnbox{background:#fff7f5;border:1px solid #e8bfb4;border-left:6px solid #c0392b}
 .tipbox{background:#f4faf6;border:1px solid #bcdcc7;border-left:6px solid #2f6f4f}
-.mombox{background:#fffdf3;border:2px solid #d9c47a;border-radius:12px;padding:18px 20px;
-margin:16px 0}
 
 /* 탭 — 라디오 + CSS 만으로 전환된다(자바스크립트가 막혀도 동작) */
 .tabs{margin:20px 0}
 .tabs>input{position:absolute;opacity:0;pointer-events:none}
-.tabbar{display:flex;gap:6px;flex-wrap:wrap;border-bottom:3px solid #2f6f4f}
-.tabbar label{cursor:pointer;padding:11px 15px;border:2px solid #cfd8d2;border-bottom:none;
-border-radius:12px 12px 0 0;background:#eceee9;font-weight:700;font-size:.97rem;color:#4a5a50;
+.tabbar{display:flex;gap:8px;flex-wrap:wrap;border-bottom:3px solid #2f6f4f}
+.tabbar label{cursor:pointer;padding:12px 18px;border:2px solid #cfd8d2;border-bottom:none;
+border-radius:12px 12px 0 0;background:#eceee9;font-weight:700;font-size:1rem;color:#4a5a50;
 margin-bottom:-3px}
-.tabbar label small{display:block;font-weight:400;font-size:.76rem;color:#6b7a70;margin-top:2px}
-.tabbar label.hyb{background:#e7f1ea;border-color:#a9cbb6;color:#1c5c38}
+.tabbar label small{display:block;font-weight:400;font-size:.78rem;color:#6b7a70;margin-top:2px}
 #t1:checked~.tabbar label[for=t1],#t2:checked~.tabbar label[for=t2],
-#t3:checked~.tabbar label[for=t3],#t4:checked~.tabbar label[for=t4],
-#t5:checked~.tabbar label[for=t5]{background:#2f6f4f;color:#fff;border-color:#2f6f4f}
+#t3:checked~.tabbar label[for=t3]{background:#2f6f4f;color:#fff;border-color:#2f6f4f}
 #t1:checked~.tabbar label[for=t1] small,#t2:checked~.tabbar label[for=t2] small,
-#t3:checked~.tabbar label[for=t3] small,#t4:checked~.tabbar label[for=t4] small,
-#t5:checked~.tabbar label[for=t5] small{color:#d7ecdd}
+#t3:checked~.tabbar label[for=t3] small{color:#d7ecdd}
 .panel{display:none;background:#fff;border:2px solid #2f6f4f;border-top:none;
 border-radius:0 0 12px 12px;padding:20px}
-#t1:checked~.panels>#p1,#t2:checked~.panels>#p2,#t3:checked~.panels>#p3,
-#t4:checked~.panels>#p4,#t5:checked~.panels>#p5{display:block}
+#t1:checked~.panels>#p1,#t2:checked~.panels>#p2,#t3:checked~.panels>#p3{display:block}
 
 .card{background:#fff;border:1px solid #ddd9d1;border-radius:14px;padding:20px;margin:18px 0;
 box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.card.mom{border:2px solid #d9c47a;background:#fffdf3}
 .card h3{margin-top:0;font-size:1.2rem;line-height:1.4}
 .rank{display:inline-block;background:#2f6f4f;color:#fff;border-radius:999px;
 width:1.9em;height:1.9em;line-height:1.9em;text-align:center;font-size:.95rem;
 font-weight:700;margin-right:.4em}
-.rank.mom{background:#b8952f;width:auto;padding:0 .8em;border-radius:999px}
 .badge{display:inline-block;padding:3px 12px;border-radius:999px;font-size:.85rem;
 font-weight:700;margin-left:.3em;white-space:nowrap}
 .g-a{background:#dff2e4;color:#1c5c38}
@@ -533,10 +489,6 @@ details[open] summary{border-radius:10px 10px 0 0;border-bottom:1px solid #e0ddd
 ol.chk,ul.chk{padding-left:1.4em;margin:.6em 0}
 ol.chk li,ul.chk li{margin:.55em 0;line-height:1.7}
 a{color:#1a5fa8}
-a.cname{color:#1a5fa8;text-decoration:underline;text-decoration-thickness:2px;
-text-underline-offset:2px;display:inline-block;padding:3px 0;min-height:28px}
-a.cname:hover{color:#0d3f78;background:#eef4fb}
-.card h3 a.cname{color:#123f6e}
 .btn{display:inline-block;background:#2f6f4f;color:#fff !important;text-decoration:none;
 padding:11px 20px;border-radius:10px;font-weight:700;margin:6px 6px 6px 0;font-size:1rem;
 border:none;cursor:pointer;font-family:inherit}
@@ -546,7 +498,6 @@ table.simple th,table.simple td{padding:8px 6px;border-bottom:1px solid #e5e2da;
 table.simple th{background:#f2f1ee}
 table.simple td.num,table.simple th.num{text-align:right}
 table.simple .sub{font-size:.82rem;color:#666}
-table.simple tr.me{background:#fff6d9}
 .wrap{overflow-x:auto;background:#fff;border:1px solid #e0ddd6;border-radius:10px;margin:8px 0}
 table.cmp{border-collapse:collapse;width:100%;font-size:.86rem;min-width:820px}
 table.cmp th,table.cmp td{padding:7px 8px;border-bottom:1px solid #eee;text-align:left;
@@ -558,8 +509,13 @@ table.cmp th.key{background:#cfe3d7}
 table.cmp td.num,table.cmp th.num{text-align:right}
 table.cmp tbody tr:nth-child(even){background:#fbfbf9}
 table.cmp tbody tr:hover{background:#eef6f0}
-table.cmp tbody tr.me{background:#fff6d9;font-weight:600}
 table.cmp .sub{font-size:.8rem;color:#666;white-space:normal}
+/* 차명을 눌러 바로 매물 페이지로 가게 한다. 표는 가로 스크롤이 되므로
+   맨 오른쪽 '보기' 링크만으로는 휴대폰에서 닿기 어렵다. */
+a.cname{color:#1a5fa8;text-decoration:underline;text-decoration-thickness:2px;
+text-underline-offset:2px;display:inline-block;padding:3px 0;min-height:28px}
+a.cname:hover{color:#0d3f78;background:#eef4fb}
+.card h3 a.cname{color:#123f6e}
 .ctl{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .ctl input,.ctl select{padding:9px 11px;border:1px solid #bbb;border-radius:8px;
 font-size:.95rem;font-family:inherit}
@@ -576,7 +532,7 @@ footer{margin-top:50px;padding-top:18px;border-top:1px solid #ccc;font-size:.85r
 @media(max-width:600px){
  body{font-size:18px}h1{font-size:1.5rem}h2{font-size:1.22rem}
  .spec li{flex:1 1 100%}main{padding:16px 14px 60px}
- .tabbar label{padding:9px 10px;font-size:.86rem;flex:1 1 45%}
+ .tabbar label{padding:10px 12px;font-size:.9rem;flex:1 1 30%}
  .panel{padding:14px}
 }
 """
@@ -604,8 +560,7 @@ function wire(n){
       tbl='#tbl'+n+' tbody tr';
   if(!q)return;
   function flt(){
-    var sv=(q.value||'').trim().toLowerCase(),fv=ff?ff.value:'',
-        av=fa?parseInt(fa.value||'0',10):0,k=0;
+    var sv=(q.value||'').trim().toLowerCase(),fv=ff.value,av=parseInt(fa.value||'0',10),k=0;
     document.querySelectorAll(tbl).forEach(function(tr){
       var ok=(!sv||tr.textContent.toLowerCase().indexOf(sv)>=0)
           && (!fv||tr.dataset.fuel===fv)
@@ -614,10 +569,10 @@ function wire(n){
     });
     cnt.textContent=k+'대 표시 중';
   }
-  [q,ff,fa].forEach(function(e){if(e)e.addEventListener('input',flt)});
+  [q,ff,fa].forEach(function(e){e.addEventListener('input',flt)});
   flt();
 }
-[1,2,3,4,5].forEach(wire);
+[1,2,3].forEach(wire);
 """
 
 
@@ -635,17 +590,16 @@ def rich(s: str) -> str:
 
 
 def won(x) -> str:
+    """원 → 만원 표기."""
     return f"{int(x) // 10000:,}"
 
 
 # ── 카드 ─────────────────────────────────────────────────────────────────────
-def card(r: dict, rank, mode: str, mom: bool = False) -> str:
+def card(r: dict, rank: int, mode: str) -> str:
     e = r["ev"]
     cls, gtext = GRADE_STYLE[e["grade"]]
     trim_txt = (f" · 트림 <b>{r['trim_rank']}/{r['trim_total']}등급</b>"
-                if r["trim_rank"] and r["trim_total"] and r["trim_total"] >= 2 else "")
-    rank_html = (f'<span class="rank mom">어머님 매물</span>' if mom
-                 else f'<span class="rank">{rank}</span>')
+                if r["trim_rank"] and r["trim_total"] else "")
     hi_v = ' class="hi"' if mode == "value" else ""
     hi_s = ' class="hi"' if mode == "sat" else ""
     money = (
@@ -660,10 +614,7 @@ def card(r: dict, rank, mode: str, mom: bool = False) -> str:
                   f'<strong>{won(e["won_per_sat"])}만원</strong></div>')
     pros = "".join(f"<li>{rich(g)}</li>" for g in e["good"][:9])
     cons = "".join(f"<li>{rich(c)}</li>" for c in e["warn"] + e["caution"])
-    checks = list(e["checks"])
-    if r["fuel"] == "하이브리드":
-        checks = HYBRID_CHECKS + checks
-    checks_html = "".join(f"<li>{rich(c)}</li>" for c in checks)
+    checks = "".join(f"<li>{rich(c)}</li>" for c in e["checks"])
     basis = r.get("group_basis") or ""
     if r["price_gap"] is None:
         gap = f'비교 가능한 차가 {r["group_n"]}대뿐이라 시세 비교 어려움'
@@ -674,8 +625,8 @@ def card(r: dict, rank, mode: str, mom: bool = False) -> str:
         gap = (f'<span style="color:#8a5a12">{basis} 기준 {r["price_gap"]:+.0%} — '
                f'<b>트림이 섞여 이 숫자는 믿을 수 없습니다</b></span>')
     return f"""
-<div class="card{' mom' if mom else ''}">
-<h3>{rank_html}<a class="cname" href="{h(r['url'])}" target="_blank"
+<div class="card">
+<h3><span class="rank">{rank}</span><a class="cname" href="{h(r['url'])}" target="_blank"
 rel="noopener nofollow">{h(r['maker'])} {h(r['model'])} {h(r['trim'])}</a>
 <span class="badge {cls}">{e['grade']} · {gtext}</span></h3>
 <p class="lead">{rich(K.character_of(r['model']))}</p>
@@ -692,8 +643,8 @@ rel="noopener nofollow">{h(r['maker'])} {h(r['model'])} {h(r['trim'])}</a>
 (끝까지 타시면 나가는 돈이 아닙니다)</p>
 <p><b>좋은 점</b></p><ul class="pros">{pros or '<li>-</li>'}</ul>
 <p><b>걸리는 점</b></p><ul class="cons">{cons or '<li>특별히 걸리는 점이 없습니다</li>'}</ul>
-<details><summary>이 차를 보러 가면 꼭 확인할 것 ({len(checks)}가지)</summary>
-<div class="dbody"><ul class="chk">{checks_html}</ul></div></details>
+<details><summary>이 차를 보러 가면 꼭 확인할 것 ({len(e['checks'])}가지)</summary>
+<div class="dbody"><ul class="chk">{checks}</ul></div></details>
 <p class="noprint"><a class="btn" href="{h(r['url'])}" target="_blank"
 rel="noopener nofollow">K카에서 이 차 보기</a>
 <span style="font-size:.85rem;color:#666">매물번호 {h(r['id'])}</span></p>
@@ -702,6 +653,7 @@ rel="noopener nofollow">K카에서 이 차 보기</a>
 
 # ── 비교표 ───────────────────────────────────────────────────────────────────
 def cmp_table(items: list[dict], tid: str, key: str) -> str:
+    """key='value' 면 10년 총지출 열을, 'sat' 면 만족요소 열을 강조한다."""
     kv = " key" if key == "value" else ""
     ks = " key" if key == "sat" else ""
     head = (f"<tr><th>차 · 트림</th><th>연식</th><th class='num'>주행(km)</th>"
@@ -715,16 +667,14 @@ def cmp_table(items: list[dict], tid: str, key: str) -> str:
     for i in items:
         e = i["ev"]
         tr = (f'{i["trim_rank"]}/{i["trim_total"]}'
-              if i["trim_rank"] and i["trim_total"] and i["trim_total"] >= 2 else "-")
+              if i["trim_rank"] and i["trim_total"] else "-")
         tr_top = (i["trim_rank"] and i["trim_total"] and i["trim_total"] >= 3
                   and i["trim_rank"] <= max(2, i["trim_total"] // 3))
         wps = won(e["won_per_sat"]) if e["won_per_sat"] else "-"
-        me = ' class="me"' if i["id"] == MOTHER_PICK else ""
-        tag = ' <span style="color:#8a6d1f">★어머님</span>' if i["id"] == MOTHER_PICK else ""
         body.append(
-            f'<tr{me} data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}">'
+            f'<tr data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}">'
             f'<td><a class="cname" href="{h(i["url"])}" target="_blank" '
-            f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a>{tag}<br>'
+            f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a><br>'
             f'<span class="sub">{h(i["trim"])}</span></td>'
             f'<td data-v="{h(i["year_month"]).replace("-", "")}">{h(i["year_month"])}</td>'
             f'<td class="num" data-v="{i["km"]}">{i["km"]:,}</td>'
@@ -746,14 +696,11 @@ def cmp_table(items: list[dict], tid: str, key: str) -> str:
             f'<tbody>{"".join(body)}</tbody></table></div>')
 
 
-def controls(n: int, fuels: list[str] | None) -> str:
-    fuel_sel = ""
-    if fuels and len(fuels) > 1:
-        opts = "".join(f'<option value="{h(f)}">{h(f)}</option>' for f in fuels)
-        fuel_sel = f'<select id="f{n}"><option value="">연료 전체</option>{opts}</select>'
+def controls(n: int, fuels: list[str]) -> str:
+    opts = "".join(f'<option value="{h(f)}">{h(f)}</option>' for f in fuels)
     return (f'<div class="ctl noprint">'
-            f'<input id="q{n}" type="search" placeholder="차명·트림 검색 (예: 니로, 시그니처)">'
-            f'{fuel_sel}'
+            f'<input id="q{n}" type="search" placeholder="차명·트림 검색 (예: 그랜저, 시그니처)">'
+            f'<select id="f{n}"><option value="">연료 전체</option>{opts}</select>'
             f'<select id="a{n}"><option value="">안전장치 전체</option>'
             f'<option value="4">4가지 전부</option><option value="3">3가지 이상</option>'
             f'<option value="2">2가지 이상</option></select>'
@@ -768,131 +715,28 @@ def build(rows, meta, stats) -> str:
         r["ev"] = evaluate(r, stats)
         items.append(r)
 
-    main = [i for i in items if (i["year"] or 0) >= MAIN_YEAR]
-    hyb = [i for i in items if i["fuel"] == "하이브리드"
-           and (i["year"] or 0) >= HYBRID_YEAR]
-    mom = next((i for i in items if i["id"] == MOTHER_PICK), None)
+    by_value = rank_value(items)
+    by_sat = rank_satisfaction(items)
+    top_value = pick_diverse(by_value)
+    top_sat = pick_diverse(by_sat)
+    fuels = sorted({i["fuel"] for i in items})
+    all_sorted = sorted(items, key=lambda i: i["ev"]["total_hold"])
 
-    tabs = [
-        ("t1", "p1", 1, "가성비", "돈이 가장 덜 나가는 차", False,
-         "value", rank_value(main),
-         f"차값이 싼 차가 아니라 <b>차값 + 유지비를 {HOLD_YEARS}년 합쳐서</b> 가장 적게 "
-         f"나가는 차입니다. 차값이 300만원 싸도 유지비가 매년 50만원 더 들면 "
-         f"{HOLD_YEARS}년이면 오히려 200만원 손해입니다.",
-         f"{MAIN_YEAR}년 이후 전체 연료"),
-        ("t2", "p2", 2, "가심비", "만족을 사는 차", False,
-         "sat", rank_satisfaction(main),
-         "매일 손에 닿는 장비와 안전장치가 가장 많은 차입니다. 만족 요소가 같다면 "
-         "총지출이 적은 차를 앞에 뒀습니다.",
-         f"{MAIN_YEAR}년 이후 전체 연료"),
-        ("t3", "p3", 3, "하이브리드 가성비", "하이브리드 중 돈이 덜 드는 차", True,
-         "value", rank_value(hyb),
-         "하이브리드만 모아 <b>같은 가성비 기준</b>으로 줄였습니다. 하이브리드는 원래 "
-         "기름값이 적게 들어 유지비 항목에서 크게 유리합니다.",
-         f"{HYBRID_YEAR}년 이후 하이브리드만"),
-        ("t4", "p4", 4, "하이브리드 가심비", "하이브리드 중 만족이 큰 차", True,
-         "sat", rank_satisfaction(hyb),
-         "하이브리드만 모아 <b>같은 가심비 기준</b>으로 줄였습니다. 조용함과 낮은 기름값에 "
-         "장비까지 갖춘 차입니다.",
-         f"{HYBRID_YEAR}년 이후 하이브리드만"),
-        ("t5", "p5", 5, "전체 비교", "조건 통과 전부", False,
-         "value", sorted(items, key=lambda i: i["ev"]["total_hold"]),
-         "하한선을 두지 않은 전체 목록입니다. 안전장치나 장비가 적은 차도 들어 있으니 "
-         "표의 숫자를 꼭 보세요.",
-         f"{HYBRID_YEAR}년 이후 전부"),
-    ]
-
-    radios = "".join(f'<input type="radio" name="tab" id="{t[0]}"'
-                     f'{" checked" if n == 0 else ""}>' for n, t in enumerate(tabs))
-    def _label(t):
-        cls = ' class="hyb"' if t[5] else ''
-        return f'<label for="{t[0]}"{cls}>{t[3]}<small>{t[4]}</small></label>'
-
-    labels = "".join(_label(t) for t in tabs)
-
-    panels = []
-    for tid, pid, num, name, _sub, is_hyb, mode, ranked, intro, scope in tabs:
-        top = pick_diverse(ranked)
-        fuels = sorted({i["fuel"] for i in ranked}) if not is_hyb else None
-        note = ""
-        if is_hyb:
-            note = (f'<div class="box tipbox" style="margin-top:0"><p style="margin:0">'
-                    f'<b>하이브리드는 물량이 적어 연식 하한을 {HYBRID_YEAR}년으로 한 해 '
-                    f'낮췄습니다.</b> ({MAIN_YEAR}년 이후만 보면 하이브리드가 '
-                    f'{sum(1 for i in hyb if (i["year"] or 0) >= MAIN_YEAR)}대뿐입니다.) '
-                    f'어머님이 보내주신 아이오닉도 2019년식이라 이 탭에 들어 있습니다.'
-                    f'</p></div>')
-        mom_here = (mom is not None and mom in ranked)
-        mom_note = ""
-        if mom is not None and is_hyb and not mom_here:
-            mom_note = ('<p style="font-size:.93rem;color:#8a5a12">'
-                        '어머님이 보내주신 아이오닉은 이 탭의 하한선(안전장치·장비)에 걸려 '
-                        '순위 목록에는 없습니다. 위 전용 칸과 아래 전체 비교 탭에서 보실 '
-                        '수 있습니다.</p>')
-        panels.append(f"""
-<div class="panel" id="{pid}">
-<h3 style="margin-top:0">{name}</h3>
-<p style="font-size:.9rem;color:#666;margin-top:-.4em">대상: <b>{scope}</b> ·
-{len(ranked)}대</p>
-{note}
-<p class="lead">{rich(intro)}</p>
-{mom_note}
-{''.join(card(r, n, mode) for n, r in enumerate(top, 1))}
-<h3>{name} 기준 전체 {len(ranked)}대</h3>
-<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가 새 창으로
-열립니다.</b> 표 머리글을 누르면 그 항목으로 다시 정렬됩니다.</p>
-{controls(num, fuels)}
-{cmp_table(ranked, f'tbl{num}', mode)}
-</div>""")
-
-    # 어머님 매물 전용 칸 ---------------------------------------------------
-    mom_html = ""
-    NIRO_CNT = ((stats.get("models") or {}).get("니로", {}) or {}).get("count", 0)
-    KONA_CNT = ((stats.get("models") or {}).get("코나", {}) or {}).get("count", 0)
-    if mom is not None:
-        peers = [i for i in items
-                 if i["model"] == mom["model"] and abs((i["year"] or 0) - (mom["year"] or 0)) <= 1]
-        def _peer_row(p):
-            is_mom = p["id"] == mom["id"]
-            cls = ' class="me"' if is_mom else ''
-            tag = " ★어머님 매물" if is_mom else ""
-            return (f'<tr{cls}>'
-                    f'<td><a class="cname" href="{h(p["url"])}" target="_blank" '
-                    f'rel="noopener nofollow">{h(p["trim"])}</a>{tag}</td>'
-                    f'<td>{h(p["year_month"])}</td><td class="num">{p["km"]:,}</td>'
-                    f'<td class="num">{p["price"]:,}</td><td>{h(p["accident"])}</td>'
-                    f'<td class="num">{p["equip_n"] or 0}</td>'
-                    f'<td class="num">{p["adas_n"] or 0}</td></tr>')
-
-        peer_rows = "".join(_peer_row(p)
-                            for p in sorted(peers, key=lambda x: -x["price"]))
-        mom_html = f"""
-<h2>어머님이 보내주신 매물</h2>
-<div class="mombox">
-<p style="margin-top:0"><b>결론부터</b> — 하이브리드로는 <b>좋은 선택</b>입니다.
-연 유지비가 {won(mom['ev']['running'])}만원으로 이 목록에서 가장 낮은 수준이고
-무사고입니다. 다만 <b>확인하고 가셔야 할 것이 두 가지</b> 있습니다.</p>
-<p><b>1. 같은 차의 윗급 트림이 더 싸게 있습니다.</b> 아이오닉 트림은 아래에서
-<b>I → N → Q</b> 순서인데, 어머님 매물은 <b>N 트림 {mom['price']:,}만원</b>입니다.
-같은 세대에 <b>Q 트림(윗급)이 1,610만원</b>으로 60만원 더 싸게 있습니다.
-주행거리는 그쪽이 7,000km 더 많습니다. 두 대를 나란히 보시고 결정하세요.</p>
-<p><b>2. 자동 긴급제동이 옵션 목록에 없습니다.</b> 후측방경보·차선이탈경보·
-스마트크루즈는 있는데, 사고를 가장 많이 줄여 주는 자동 긴급제동이 빠져 있습니다.
-차에서 직접 확인해 보시고, 없다면 이 기능이 있는 차와 꼭 비교해 보세요.</p>
-<p style="font-size:.93rem;color:#666"><b>참고 — 아이오닉은 드문 차입니다.</b>
-K카 직영 재고 전체에서 아이오닉(전기차 제외)은 <b>{mom['ev']['stock']}대</b>,
-그중 이 세대(‘{h(mom['model'])}’)는 <b>{mom['ev']['gen_stock']}대</b>뿐입니다.
-부품을 주문해야 할 수 있고 동네 정비소가 안 만져 봤을 수 있습니다.
-오래 타실 계획이면 치명적이지는 않지만 알고 계시는 게 좋습니다.
-(같은 하이브리드인 니로는 {NIRO_CNT}대, 코나는 {KONA_CNT}대입니다.)</p>
-<h3>같은 아이오닉끼리 비교 (같은 세대, 연식 ±1년)</h3>
-<div class="wrap"><table class="simple"><thead><tr><th>트림</th><th>연식</th>
-<th class="num">주행(km)</th><th class="num">차값(만)</th><th>사고</th>
-<th class="num">장비</th><th class="num">안전</th></tr></thead>
-<tbody>{peer_rows}</tbody></table></div>
-</div>
-{card(mom, None, 'value', mom=True)}
-"""
+    # 두 기준 나란히
+    vpos = {i["id"]: n for n, i in enumerate(by_value, 1)}
+    spos = {i["id"]: n for n, i in enumerate(by_sat, 1)}
+    both = sorted([i for i in by_value if i["id"] in spos],
+                  key=lambda i: vpos[i["id"]] + spos[i["id"]])
+    both_rows = "".join(
+        f'<tr><td><a class="cname" href="{h(i["url"])}" target="_blank" '
+        f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a><br>'
+        f'<span class="sub">{h(i["trim"])}</span></td>'
+        f'<td class="num">{i["price"]:,}</td>'
+        f'<td class="num">{won(i["ev"]["total_hold"])}</td>'
+        f'<td class="num">{i["ev"]["sat"]}</td>'
+        f'<td class="num">{vpos[i["id"]]}위</td><td class="num">{spos[i["id"]]}위</td>'
+        f'<td><a href="{h(i["url"])}" target="_blank" rel="noopener nofollow">보기</a></td></tr>'
+        for i in both[:12])
 
     dist: dict[str, int] = {}
     for i in items:
@@ -929,11 +773,10 @@ K카 직영 재고 전체에서 아이오닉(전기차 제외)은 <b>{mom['ev'][
         f"<div class='dbody'><ol class='chk'>"
         + "".join(f"<li>{rich(l)}</li>" for l in lines) + "</ol></div></details>"
         for idx, (t, lines) in enumerate(FIELD_CHECKLIST, 1))
-    hyb_chk = "".join(f"<li>{rich(x)}</li>" for x in HYBRID_CHECKS)
 
     c = meta.get("conditions", {})
     pool = meta.get("comparable_pool", 0)
-    n_hyb_main = sum(1 for i in hyb if (i["year"] or 0) >= MAIN_YEAR)
+    n_adas4 = sum(1 for i in items if (i["adas_n"] or 0) >= 4)
     cap_man = GASIMBI_RUN_CAP // 10000
 
     return f"""<!doctype html>
@@ -941,49 +784,45 @@ K카 직영 재고 전체에서 아이오닉(전기차 제외)은 <b>{mom['ev'][
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<title>어머님을 위한 중고차 고르기 — 가성비 · 가심비 · 하이브리드</title>
+<title>어머님을 위한 중고차 고르기 — 찐가성비 vs 가심비</title>
 <style>{CSS}</style>
 </head><body><main>
 
 <h1>어머님을 위한 중고차 고르기</h1>
 <p class="lead">K카(kcar.com) 직영 재고를 <b>한 대도 빼지 않고 전부</b> 훑어
-조건에 맞는 <b>{len(items)}대</b>를 골랐습니다. 고르는 기준이 사람마다 다르니
-<b>다섯 개 탭</b>으로 나눠 두었습니다. 직접 눌러 비교해 보세요.</p>
+조건에 맞는 <b>{len(items)}대</b>를 골랐습니다.
+고르는 기준이 사람마다 다르니 <b>두 가지 기준을 탭으로 나눠</b> 두었습니다.
+직접 눌러 비교해 보세요.</p>
 
 <div class="top">
 <p><b>수집 일시</b> {h(meta.get('collected_at'))} · <b>출처</b> K카(kcar.com) 직영 매물</p>
 <p>직영 재고 <b>{meta.get('collected', 0):,}대 전체</b>를 받아 <b>{pool:,}대</b>를
 시세 기준으로 쓰고, 조건에 맞는 <b>{len(items)}대</b>를 골랐습니다.
-그중 <b>하이브리드는 {len(hyb)}대</b>입니다.</p>
-<p>조건: <b>5인승 · 현대·기아(제네시스 포함) · 차량가 {c.get('budget', 2200):,}만원 이하 ·
-{c.get('km', 100000):,}km 이하 · 무사고 또는 단순수리</b>.
-SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제외), 미니밴·카니발·경차·화물·
-승합·렌터카는 제외했습니다. 연식은 일반 탭 <b>{MAIN_YEAR}년 이후</b>,
-하이브리드 탭은 물량이 적어 <b>{HYBRID_YEAR}년 이후</b>입니다.</p>
+그중 안전장치 4가지를 다 갖춘 차가 <b>{n_adas4}대</b>입니다.</p>
+<p>조건: <b>{c.get('year', 2020)}년 이후 · 5인승 · 현대·기아(제네시스 포함) ·
+차량가 {c.get('budget', 2200):,}만원 이하 · {c.get('km', 100000):,}km 이하 ·
+무사고 또는 단순수리</b>. SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제외),
+미니밴·카니발·경차·화물·승합·렌터카는 제외했습니다.</p>
 <p style="font-size:.88rem">{h(DISCLAIMER)}</p>
 </div>
 
-{mom_html}
-
 <div class="box tipbox">
-<h3 style="margin-top:0">탭이 무엇이 다른가</h3>
-<table class="simple"><thead><tr><th>탭</th><th>보는 숫자</th><th>대상</th></tr></thead><tbody>
-<tr><td><b>가성비</b></td><td>{HOLD_YEARS}년 총지출 = 차값 + 유지비×{HOLD_YEARS}<br>
-<span class="sub">적은 순</span></td><td>{MAIN_YEAR}년 이후 전체 연료</td></tr>
-<tr><td><b>가심비</b></td><td>만족 요소 = 체감 장비 8 + 안전장치 4<br>
-<span class="sub">많은 순, 같으면 총지출 적은 순</span></td>
-<td>{MAIN_YEAR}년 이후 전체 연료</td></tr>
-<tr><td><b>하이브리드 가성비</b></td><td>위와 같은 총지출 기준</td>
-<td>{HYBRID_YEAR}년 이후 하이브리드</td></tr>
-<tr><td><b>하이브리드 가심비</b></td><td>위와 같은 만족 요소 기준</td>
-<td>{HYBRID_YEAR}년 이후 하이브리드</td></tr>
-<tr><td><b>전체 비교</b></td><td>총지출 순 (하한선 없음)</td><td>전부 {len(items)}대</td></tr>
+<h3 style="margin-top:0">두 기준이 무엇이 다른가</h3>
+<table class="simple"><thead><tr><th></th><th>찐가성비</th><th>가심비</th></tr></thead><tbody>
+<tr><td><b>한 줄로</b></td><td>돈이 가장 덜 나가는 차</td>
+<td>돈을 좀 더 쓰고 만족을 사는 차</td></tr>
+<tr><td><b>보는 숫자</b></td><td><b>{HOLD_YEARS}년 총지출</b><br>
+= 차값 + 유지비×{HOLD_YEARS}</td>
+<td><b>만족 요소 개수</b><br>= 체감 장비 8가지 + 안전장치 4가지</td></tr>
+<tr><td><b>순서</b></td><td>총지출이 적은 순</td>
+<td>만족 요소가 많은 순<br>(같으면 총지출 적은 순)</td></tr>
+<tr><td><b>제한</b></td><td colspan="2">두 기준 모두 안전장치 {MIN_ADAS}가지 이상,
+장비 {MIN_EQUIP}가지 이상, 경고 없는 차만. 가심비는 연 유지비 {cap_man}만원
+이하까지만(‘값도 적당’ 조건)</td></tr>
 </tbody></table>
-<p>네 개 순위 탭은 모두 <b>안전장치 {MIN_ADAS}가지 이상, 장비 {MIN_EQUIP}가지 이상,
-경고 없는 차</b>만 올립니다. 가심비 탭은 추가로 <b>연 유지비 {cap_man}만원 이하</b>
-(‘값도 적당’ 조건)입니다.</p>
-<p><b>감가는 어느 탭에서도 순위에 쓰지 않았습니다.</b> 끝까지 타실 계획이라면
-중간 시세는 통장에서 나가는 돈이 아니기 때문입니다. 참고로만 카드에 적어 두었습니다.</p>
+<p><b>감가는 두 기준 모두에서 순위에 쓰지 않았습니다.</b>
+끝까지 타실 계획이라면 중간 시세는 통장에서 나가는 돈이 아니기 때문입니다.
+참고로만 각 카드에 적어 두었습니다.</p>
 </div>
 
 <div class="box warnbox">
@@ -997,30 +836,80 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 
 <h2>기준을 골라 비교하세요</h2>
 <div class="tabs">
-{radios}
-<div class="tabbar">{labels}</div>
-<div class="panels">{''.join(panels)}</div>
+<input type="radio" name="tab" id="t1" checked>
+<input type="radio" name="tab" id="t2">
+<input type="radio" name="tab" id="t3">
+<div class="tabbar">
+<label for="t1">찐가성비<small>돈이 가장 덜 나가는 차</small></label>
+<label for="t2">가심비<small>만족을 사는 차</small></label>
+<label for="t3">두 기준 나란히<small>같은 차의 두 순위</small></label>
+</div>
+<div class="panels">
+
+<div class="panel" id="p1">
+<h3 style="margin-top:0">찐가성비 — {HOLD_YEARS}년 동안 돈이 가장 덜 나가는 차</h3>
+<p class="lead">차값이 싼 차가 아니라 <b>차값 + 유지비를 {HOLD_YEARS}년 합쳐서</b>
+가장 적게 나가는 차입니다. 차값이 300만원 싸도 유지비가 매년 50만원 더 들면
+{HOLD_YEARS}년이면 오히려 200만원 손해입니다. 그래서 두 개를 합쳐서 봅니다.</p>
+{''.join(card(r, n, 'value') for n, r in enumerate(top_value, 1))}
+<h3>찐가성비 기준 전체 {len(by_value)}대</h3>
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> {HOLD_YEARS}년 총지출이 적은 순이며,
+표 머리글을 누르면 그 항목으로 다시 정렬됩니다.</p>
+{controls(1, fuels)}
+{cmp_table(by_value, 'tbl1', 'value')}
 </div>
 
-<h2>하이브리드를 보실 때 꼭 확인할 것</h2>
-<p class="lead">어머님이 하이브리드에 좋은 경험이 있으시다면 그 판단이 맞습니다.
-<b>시내와 정체 구간에서는 하이브리드가 가장 편하고 기름값도 가장 적게 듭니다.</b>
-다만 일반 차와 다른 점이 있어 볼 것이 조금 다릅니다.</p>
-<div class="box tipbox"><ul class="chk">{hyb_chk}</ul></div>
-<p style="font-size:.93rem;color:#555">이 목록의 하이브리드 {len(hyb)}대의 연 유지비는
-평균적으로 가솔린차보다 낮습니다. 하이브리드 탭의 '연 유지비' 열을 다른 탭과 비교해 보세요.</p>
+<div class="panel" id="p2">
+<h3 style="margin-top:0">가심비 — 돈을 좀 더 쓰고 만족을 사는 차</h3>
+<p class="lead">매일 손에 닿는 장비와 안전장치가 가장 많은 차입니다.
+세는 항목은 <b>체감 장비 8가지</b>(통풍시트·전동시트·무선충전·어라운드뷰·
+헤드업디스플레이·선루프·스마트크루즈·뒷좌석 열선)와
+<b>안전장치 4가지</b>(자동긴급제동·차선이탈경보·후측방경보·스마트크루즈)입니다.
+전 차량에 다 들어 있는 항목(후방센서·열선시트 등)은 구분이 안 되므로 세지 않았습니다.</p>
+<p class="lead">다만 <b>‘값도 적당’</b>이 조건이라, 연 유지비가 {cap_man}만원을 넘는
+대배기량 차는 이 탭에서 뺐습니다. 만족 요소가 같다면 총지출이 적은 차를 앞에 뒀습니다.</p>
+{''.join(card(r, n, 'sat') for n, r in enumerate(top_sat, 1))}
+<h3>가심비 기준 전체 {len(by_sat)}대</h3>
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> 만족 요소가 많은 순이며,
+'요소당 지출'은 만족 요소 1가지를 얻는 데 {HOLD_YEARS}년간 드는 돈이라
+<b>이 숫자가 작을수록 가심비가 좋습니다.</b></p>
+{controls(2, fuels)}
+{cmp_table(by_sat, 'tbl2', 'sat')}
+</div>
+
+<div class="panel" id="p3">
+<h3 style="margin-top:0">두 기준에서 모두 앞에 오는 차</h3>
+<p class="lead">두 순위를 더해 낮은 순입니다. <b>돈도 덜 들고 만족 요소도 많은,
+타협이 가장 적은 차</b>들입니다. 어느 쪽을 고를지 정하기 어려우시면 여기서 보세요.</p>
+<div class="wrap"><table class="simple"><thead><tr><th>차 · 트림</th>
+<th class="num">차값(만)</th><th class="num">{HOLD_YEARS}년 총지출(만)</th>
+<th class="num">만족요소</th><th class="num">찐가성비<br>순위</th>
+<th class="num">가심비<br>순위</th><th></th></tr></thead>
+<tbody>{both_rows}</tbody></table></div>
+<h3>전체 {len(items)}대 (총지출 순)</h3>
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> 하한선을 두지 않은 전체 목록이라
+안전장치나 장비가 적은 차도 들어 있으니 표의 숫자를 꼭 보세요.</p>
+{controls(3, fuels)}
+{cmp_table(all_sorted, 'tbl3', 'value')}
+</div>
+
+</div></div>
 
 <h2>표에 나오는 말 풀이</h2>
 <div class="box" style="font-size:.95rem">
 <p style="margin:.3em 0"><b>{HOLD_YEARS}년 총지출</b> — 차값 + (자동차세 + 기름값) ×
 {HOLD_YEARS}년. 기름값은 1년 {ANNUAL_KM:,}km 기준입니다. <b>감가는 넣지 않았습니다.</b></p>
-<p style="margin:.3em 0"><b>만족 요소</b> — 체감 장비 8가지(통풍시트·전동시트·무선충전·
-어라운드뷰·헤드업디스플레이·선루프·스마트크루즈·뒷좌석 열선) + 안전장치 4가지
-= 최대 12가지 중 몇 개인지입니다. 전 차량에 다 있는 항목은 구분이 안 되므로 세지 않았습니다.</p>
+<p style="margin:.3em 0"><b>만족 요소</b> — 체감 장비 8가지 + 안전장치 4가지 = 최대 12가지
+중 몇 개인지입니다.</p>
 <p style="margin:.3em 0"><b>요소당 지출</b> — {HOLD_YEARS}년 총지출 ÷ 만족 요소 개수.
 작을수록 같은 돈으로 더 많은 만족을 얻는다는 뜻입니다.</p>
 <p style="margin:.3em 0"><b>트림 등급</b> — <b>1/7</b>은 그 세대 7개 트림 중 가장 위
 등급이라는 뜻입니다. 숫자가 작을수록 좋은 트림입니다.</p>
+<p style="margin:.3em 0"><b>장비(24중)</b> — 후방카메라·어라운드뷰·통풍시트·스마트키·내비 등
+24가지를 세어 몇 개 있는지입니다.</p>
 <p style="margin:.3em 0"><b>안전장치</b> — 자동긴급제동·차선이탈경보·후측방경보·
 스마트크루즈 4가지 중 몇 개인지. <b>4가 최고</b>입니다.</p>
 </div>
@@ -1030,37 +919,42 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 중간에 시세가 얼마인지는 통장에서 나가는 돈이 아닙니다.
 반대로 세금·기름값은 <b>타는 동안 실제로 나갑니다.</b></p>
 <div class="box warnbox">
-<p style="margin-top:0">직영 재고에서 배기량별로 {HOLD_YEARS}년 유지비를 계산했습니다.
-끝까지 타실 거라면 이 표가 차값보다 중요합니다.</p>
-<table class="simple"><thead><tr><th>배기량</th>
+<p style="margin-top:0">후보 {len(items)}대를 배기량으로 나눠 {HOLD_YEARS}년 유지비를
+계산했습니다. 끝까지 타실 거라면 이 표가 차값보다 중요합니다.</p>
+<table class="simple"><thead><tr><th>배기량</th><th class="num">대수</th>
 <th class="num">연 유지비</th><th class="num">{HOLD_YEARS}년 누적</th></tr></thead><tbody>
-<tr><td>1,600cc 이하</td><td class="num">162만원</td>
+<tr><td>1,600cc 이하</td><td class="num">181대</td><td class="num">162만원</td>
 <td class="num"><b style="color:#1c5c38">1,622만원</b></td></tr>
-<tr><td>1,600~2,000cc</td><td class="num">212만원</td><td class="num">2,119만원</td></tr>
-<tr><td>2,000~2,600cc</td><td class="num">237만원</td><td class="num">2,374만원</td></tr>
-<tr><td>2,600cc 초과</td><td class="num">280만원</td>
+<tr><td>1,600~2,000cc</td><td class="num">88대</td><td class="num">212만원</td>
+<td class="num">2,119만원</td></tr>
+<tr><td>2,000~2,600cc</td><td class="num">79대</td><td class="num">237만원</td>
+<td class="num">2,374만원</td></tr>
+<tr><td>2,600cc 초과</td><td class="num">17대</td><td class="num">280만원</td>
 <td class="num"><b style="color:#932018">2,799만원</b></td></tr>
 </tbody></table>
 <p><b>1,600cc와 2,600cc 초과의 {HOLD_YEARS}년 차이는 1,177만원</b>으로 차값 차이보다
-큰 경우가 많습니다. <b>트림은 높이고 배기량은 낮추는 조합</b>이 가장 유리하며,
-하이브리드는 배기량이 작고 기름값이 적어 이 기준에서 가장 좋습니다.</p>
+큰 경우가 많습니다. 그래서 "원래 비쌌던 좋은 차"를 고르실 때
+<b>트림은 높이고 배기량은 낮추는 조합</b>이 가장 유리합니다.</p>
 </div>
 <div class="box tipbox">
 <p style="margin-top:0"><b>'많이 떨어진 비싼 차'는 어떨까</b> — 재고 {pool:,}대에서
 같은 세대 인접 연식 시세를 비교하면, 차령이 오래되면 감가액은 줄어듭니다
 (3년차 218만원 → 10년차 40만원). 그런데 <b>지금 시세가 높은 차는 이미 많이 떨어진
-뒤에도 계속 큰 금액으로 떨어집니다</b>(차령 3~6년: 1,500~2,500만원대 연 4.4%,
+뒤에도 계속 큰 금액으로 떨어집니다</b>(차령 3~6년 기준: 1,500~2,500만원대 연 4.4%,
 2,500~4,000만원대 연 9.0%, 4,000만원 이상 연 10.3%).
+그리고 유지비는 신차 가격이 아니라 배기량을 따라오므로 계속 나갑니다.
 <b>끝까지 타실 거라면 감가는 무시하고 위 유지비 표만 보시면 됩니다.</b></p>
 </div>
 
 <h2>어디서 사는 게 좋은가</h2>
-<p class="lead">같은 차라도 파는 곳에 따라 진단 기준·보증·환불 조건이 크게 다릅니다.</p>
+<p class="lead">같은 차라도 파는 곳에 따라 진단 기준·보증·환불 조건이 크게 다릅니다.
+아래는 실제로 확인한 내용입니다.</p>
 <div class="box">{channels}</div>
 <div class="box tipbox">
 <p style="margin-top:0"><b>안전을 가장 앞에 두신다면</b> 값을 조금 더 쓰셔도
-<b>제조사 인증중고차(현대·기아 공식)</b>가 가장 확실합니다. 그다음이
-<b>K카 같은 직영</b>, 마지막이 <b>딜러 매물 플랫폼</b>(엔카·KB차차차)입니다.</p>
+<b>제조사 인증중고차(현대·기아 공식)</b>가 가장 확실합니다. 제조사가 직접 진단하고
+신차 보증 잔여 기간을 이어 줍니다. 그다음이 <b>K카 같은 직영</b>,
+마지막이 <b>딜러 매물 플랫폼</b>(엔카·KB차차차)입니다.</p>
 <p><b>이 페이지의 차는 전부 K카 직영 매물입니다.</b> 엔카는 사이트 규칙이 매물 데이터의
 자동 조회를 금지해 수집하지 않았고, 현대 인증중고차는 규칙상 허용되지만 사이트가
 자동 조회를 거부해 받지 못했습니다. 두 곳은 위 링크로 직접 보시는 것이 맞습니다.</p>
@@ -1068,23 +962,30 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 
 <h2>연료는 이렇게 고르세요</h2>
 <div class="box">{fuel_guide}</div>
+<div class="box warnbox">
+<p style="margin:0"><b>가장 흔한 실수</b> — 연비가 좋다는 말만 듣고 디젤을 고르는 것입니다.
+집 근처 마트·병원·가까운 시내만 다니신다면 디젤은 배기가스를 태우는 장치가 막혀
+수리비가 크게 나올 수 있습니다. <b>편도 10km 안쪽을 주로 다니시면
+가솔린이나 하이브리드를 고르세요.</b></p>
+</div>
 
 <h2>보러 가실 때 쓰는 체크리스트</h2>
 <p class="lead">순서대로 하시면 됩니다. 인쇄하시거나 휴대폰으로 열어두고 하나씩
-확인하세요. <b>아래를 다 지키면 대부분의 나쁜 차는 걸러집니다.</b>
-하이브리드는 위의 '하이브리드를 보실 때 꼭 확인할 것'을 함께 보세요.</p>
+확인하세요. <b>아래를 다 지키면 대부분의 나쁜 차는 걸러집니다.</b></p>
 <p class="noprint"><button class="btn" onclick="window.print()">이 페이지 인쇄하기</button>
 <a class="btn alt" href="#red">'이런 차는 사지 마세요'부터 보기</a></p>
 {chk_html}
 
 <h2 id="red">이런 차는 사지 마세요</h2>
-<p class="lead">아래 중 <b>하나라도</b> 해당되면 값이 아무리 싸도 넘어가세요.</p>
+<p class="lead">아래 중 <b>하나라도</b> 해당되면 값이 아무리 싸도 넘어가세요.
+중고차는 이 차 아니면 안 되는 경우가 없습니다.</p>
 <div class="box warnbox"><ul class="chk">
 {''.join(f'<li>{rich(x)}</li>' for x in RED_FLAGS)}
 </ul></div>
 
 <h2>계약 전에 꼭 조회할 3곳</h2>
-<p class="lead">차대번호만 있으면 집에서 조회할 수 있습니다.</p>
+<p class="lead">차대번호만 있으면 집에서 조회할 수 있습니다.
+여기서 걸러지는 차가 생각보다 많습니다.</p>
 <div class="box">{look}</div>
 
 <h2>전체 {meta.get('collected', 0):,}대에서 어떻게 {len(items)}대가 남았나</h2>
@@ -1094,7 +995,8 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 </tbody></table>
 
 <h2>등급 표시</h2>
-<p class="lead">점수가 아니라 <b>확인할 점이 몇 가지인지</b>로 나눴습니다.</p>
+<p class="lead">점수가 아니라 <b>확인할 점이 몇 가지인지</b>로 나눴습니다.
+'따져보기'가 나쁜 차라는 뜻은 아니고 확인할 것이 많다는 뜻입니다.</p>
 <table class="simple" id="t-grade"><thead><tr><th>등급</th><th>뜻</th>
 <th class="num">대수</th></tr></thead><tbody>{dist_rows}</tbody></table>
 <p class="noprint" style="margin-top:20px">
@@ -1105,15 +1007,14 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 <p><b>출처</b> K카(kcar.com) 직영 매물 목록. 직영 재고 {meta.get('collected', 0):,}대 전체
 수집, 수집 {h(meta.get('collected_at'))}. 사진은 싣지 않았고 각 매물의 K카 페이지로
 연결만 합니다. K카 규칙에 따라 상세 페이지는 조회하지 않았고, 요청은 순차·1.8초
-간격으로 보냈습니다. 하이브리드 탭만 연식 하한을 {HYBRID_YEAR}년으로 낮췄습니다
-({MAIN_YEAR}년 이후 하이브리드가 {n_hyb_main}대뿐이기 때문입니다).</p>
+간격으로 보냈습니다.</p>
 <p><b>근거</b> 엔진이 어느 차에 쓰였고 리콜이 있었는지는 공개된 엔진 자료(위키피디아
 Hyundai Theta / R engine)와 미국 집단소송 합의 공지에서 확인했습니다.
 차종별 물량·연식별 시세·감가는 위 재고 전체에서 직접 계산했습니다.
-자동차세·기름값은 <b>대략값</b>이며 실제 고지액과 주행 습관에 따라 달라집니다
-(아이오닉은 전용 해치백으로 공기저항이 작아 같은 1.6 하이브리드보다 연비를 높게 잡았습니다).
-보험료와 수리비는 사람·차마다 달라 넣지 않았습니다. 그 밖의 점검 항목은 널리 알려진
-정비 상식으로, <b>특정 차량에 결함이 있다는 뜻이 아닙니다.</b></p>
+자동차세·기름값은 <b>대략값</b>이며 실제 고지액과 주행 습관에 따라 달라집니다.
+보험료와 수리비는 사람·차마다 달라 넣지 않았습니다.
+그 밖의 점검 항목은 널리 알려진 정비 상식으로,
+<b>특정 차량에 결함이 있다는 뜻이 아닙니다.</b></p>
 <p>{h(DISCLAIMER)}</p>
 </footer>
 </main>
@@ -1135,12 +1036,8 @@ def main():
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(build(rows, meta, stats))
     items = [dict(r, ev=evaluate(dict(r), stats)) for r in rows]
-    main_i = [i for i in items if (i["year"] or 0) >= MAIN_YEAR]
-    hyb_i = [i for i in items if i["fuel"] == "하이브리드" and (i["year"] or 0) >= HYBRID_YEAR]
-    print(f"{args.out} 생성 — 전체 {len(rows)}대 / "
-          f"가성비 {len(rank_value(main_i))} / 가심비 {len(rank_satisfaction(main_i))} / "
-          f"하이브리드 가성비 {len(rank_value(hyb_i))} / "
-          f"하이브리드 가심비 {len(rank_satisfaction(hyb_i))}")
+    print(f"{args.out} 생성 — 후보 {len(rows)}대 / "
+          f"찐가성비 {len(rank_value(items))}대 / 가심비 {len(rank_satisfaction(items))}대")
 
 
 if __name__ == "__main__":

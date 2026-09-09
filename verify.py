@@ -152,6 +152,7 @@ def main() -> None:
     print("=" * 78)
     print("2-2) docs/index.html (어머님용 가이드) 검사")
     print("=" * 78)
+    import re as _re0
     gscan = Scan()
     gbody = open(GUIDE_PATH, encoding="utf-8").read()
     gscan.feed(gbody)
@@ -180,16 +181,25 @@ def main() -> None:
         ok &= passed
         print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
     # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
-    t3 = gscan.rows.get("tbl3", -1)
-    passed = t3 == len(rows)
+    t5 = gscan.rows.get("tbl5", -1)      # 전체 비교 탭
+    passed = t5 == len(rows)
     ok &= passed
-    print(f"  {'OK  ' if passed else 'DIFF'} 전체 탭 표(tbl3) 행 수: 가이드={t3} / CSV={len(rows)}")
-    for tid in ("tbl1", "tbl2"):
+    print(f"  {'OK  ' if passed else 'DIFF'} 전체 탭 표(tbl5) 행 수: 가이드={t5} / CSV={len(rows)}")
+    for tid in ("tbl1", "tbl2", "tbl3", "tbl4"):
         n = gscan.rows.get(tid, -1)
         sub_ok = 0 < n <= len(rows)
         ok &= sub_ok
         print(f"  {'OK  ' if sub_ok else 'FAIL'} {tid} 행 수 {n} (0 < n <= {len(rows)})")
-    for need in ("찐가성비", "가심비", 'id="t1"', 'id="t2"', 'id="t3"', 'class="panel"'):
+    # 하이브리드 탭(tbl3/tbl4)은 하이브리드만 들어 있어야 한다
+    for tid in ("tbl3", "tbl4"):
+        m = _re0.search(r'id="' + tid + r'".*?</table>', gbody, _re0.S)
+        if m:
+            fuels = set(_re0.findall(r'data-fuel="([^"]*)"', m.group(0)))
+            hyb_only = fuels <= {"하이브리드"}
+            ok &= hyb_only
+            print(f"  {'OK  ' if hyb_only else 'FAIL'} {tid} 하이브리드만 포함: {fuels}")
+    for need in ("가성비", "가심비", "하이브리드 가성비", "하이브리드 가심비",
+                 'id="t1"', 'id="t2"', 'id="t3"', 'id="t4"', 'id="t5"', 'class="panel"'):
         p_ok = need in gbody
         ok &= p_ok
         print(f"  {'OK  ' if p_ok else 'FAIL'} 탭 구성 '{need}' 존재")
@@ -218,12 +228,12 @@ def main() -> None:
         ok &= bool(passed)
         print(f"  {'OK  ' if passed else 'FAIL'} {label}: {detail}")
     # 표별로 행 수와 링크 수가 같은지 (한 행이라도 링크가 빠지면 잡힌다)
-    for tid in ("tbl1", "tbl2", "tbl3"):
+    for tid in ("tbl1", "tbl2", "tbl3", "tbl4", "tbl5"):
         m = _re.search(r'id="' + tid + r'".*?</table>', gbody, _re.S)
         if not m:
             continue
         body_t = m.group(0)
-        n_rows = len(_re.findall(r"<tr data-fuel=", body_t))
+        n_rows = len(_re.findall(r"<tr[^>]*data-fuel=", body_t))
         n_link = len(_re.findall(r"carInfoDtl\?i_sCarCd=", body_t))
         same = n_rows * 2 == n_link      # 행마다 차명 링크 + '보기' 링크 = 2개
         ok &= same

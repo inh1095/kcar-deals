@@ -255,9 +255,21 @@ def missing_fuel_economy() -> list[str]:
     return [k for k in ENGINES if k not in FUEL_ECONOMY]
 
 
-def annual_fuel_cost(engine_key: str, fuel: str, annual_km: int = ANNUAL_KM) -> int | None:
-    """연간 유류비 대략값(원)."""
+# 같은 엔진이라도 차체가 다르면 연비가 크게 다른 경우의 보정.
+# 아이오닉 하이브리드는 니로와 같은 1.6 하이브리드지만 공기저항이 작은 전용 해치백이라
+# 공인 복합연비가 20~22km/L 로 니로(약 19.5)보다 높다.
+MODEL_FUEL_ECONOMY = {"아이오닉": 21.0}
+
+
+def annual_fuel_cost(engine_key: str, fuel: str, annual_km: int = ANNUAL_KM,
+                     model: str | None = None) -> int | None:
+    """연간 유류비 대략값(원). model 을 주면 차체별 보정을 적용한다."""
     kmpl = FUEL_ECONOMY.get(engine_key)
+    if model:
+        for hint, v in MODEL_FUEL_ECONOMY.items():
+            if hint in model:
+                kmpl = v
+                break
     price = FUEL_PRICE.get(fuel)
     if not kmpl or not price:
         return None
