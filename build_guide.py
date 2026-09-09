@@ -510,6 +510,12 @@ table.cmp td.num,table.cmp th.num{text-align:right}
 table.cmp tbody tr:nth-child(even){background:#fbfbf9}
 table.cmp tbody tr:hover{background:#eef6f0}
 table.cmp .sub{font-size:.8rem;color:#666;white-space:normal}
+/* 차명을 눌러 바로 매물 페이지로 가게 한다. 표는 가로 스크롤이 되므로
+   맨 오른쪽 '보기' 링크만으로는 휴대폰에서 닿기 어렵다. */
+a.cname{color:#1a5fa8;text-decoration:underline;text-decoration-thickness:2px;
+text-underline-offset:2px;display:inline-block;padding:3px 0;min-height:28px}
+a.cname:hover{color:#0d3f78;background:#eef4fb}
+.card h3 a.cname{color:#123f6e}
 .ctl{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .ctl input,.ctl select{padding:9px 11px;border:1px solid #bbb;border-radius:8px;
 font-size:.95rem;font-family:inherit}
@@ -620,7 +626,8 @@ def card(r: dict, rank: int, mode: str) -> str:
                f'<b>트림이 섞여 이 숫자는 믿을 수 없습니다</b></span>')
     return f"""
 <div class="card">
-<h3><span class="rank">{rank}</span>{h(r['maker'])} {h(r['model'])} {h(r['trim'])}
+<h3><span class="rank">{rank}</span><a class="cname" href="{h(r['url'])}" target="_blank"
+rel="noopener nofollow">{h(r['maker'])} {h(r['model'])} {h(r['trim'])}</a>
 <span class="badge {cls}">{e['grade']} · {gtext}</span></h3>
 <p class="lead">{rich(K.character_of(r['model']))}</p>
 <ul class="spec">
@@ -666,7 +673,8 @@ def cmp_table(items: list[dict], tid: str, key: str) -> str:
         wps = won(e["won_per_sat"]) if e["won_per_sat"] else "-"
         body.append(
             f'<tr data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}">'
-            f'<td><b>{h(i["maker"])} {h(i["model"])}</b><br>'
+            f'<td><a class="cname" href="{h(i["url"])}" target="_blank" '
+            f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a><br>'
             f'<span class="sub">{h(i["trim"])}</span></td>'
             f'<td data-v="{h(i["year_month"]).replace("-", "")}">{h(i["year_month"])}</td>'
             f'<td class="num" data-v="{i["km"]}">{i["km"]:,}</td>'
@@ -720,7 +728,8 @@ def build(rows, meta, stats) -> str:
     both = sorted([i for i in by_value if i["id"] in spos],
                   key=lambda i: vpos[i["id"]] + spos[i["id"]])
     both_rows = "".join(
-        f'<tr><td><b>{h(i["maker"])} {h(i["model"])}</b><br>'
+        f'<tr><td><a class="cname" href="{h(i["url"])}" target="_blank" '
+        f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a><br>'
         f'<span class="sub">{h(i["trim"])}</span></td>'
         f'<td class="num">{i["price"]:,}</td>'
         f'<td class="num">{won(i["ev"]["total_hold"])}</td>'
@@ -844,7 +853,8 @@ def build(rows, meta, stats) -> str:
 {HOLD_YEARS}년이면 오히려 200만원 손해입니다. 그래서 두 개를 합쳐서 봅니다.</p>
 {''.join(card(r, n, 'value') for n, r in enumerate(top_value, 1))}
 <h3>찐가성비 기준 전체 {len(by_value)}대</h3>
-<p style="font-size:.93rem;color:#555">{HOLD_YEARS}년 총지출이 적은 순입니다.
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> {HOLD_YEARS}년 총지출이 적은 순이며,
 표 머리글을 누르면 그 항목으로 다시 정렬됩니다.</p>
 {controls(1, fuels)}
 {cmp_table(by_value, 'tbl1', 'value')}
@@ -861,7 +871,8 @@ def build(rows, meta, stats) -> str:
 대배기량 차는 이 탭에서 뺐습니다. 만족 요소가 같다면 총지출이 적은 차를 앞에 뒀습니다.</p>
 {''.join(card(r, n, 'sat') for n, r in enumerate(top_sat, 1))}
 <h3>가심비 기준 전체 {len(by_sat)}대</h3>
-<p style="font-size:.93rem;color:#555">만족 요소가 많은 순입니다.
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> 만족 요소가 많은 순이며,
 '요소당 지출'은 만족 요소 1가지를 얻는 데 {HOLD_YEARS}년간 드는 돈이라
 <b>이 숫자가 작을수록 가심비가 좋습니다.</b></p>
 {controls(2, fuels)}
@@ -878,7 +889,8 @@ def build(rows, meta, stats) -> str:
 <th class="num">가심비<br>순위</th><th></th></tr></thead>
 <tbody>{both_rows}</tbody></table></div>
 <h3>전체 {len(items)}대 (총지출 순)</h3>
-<p style="font-size:.93rem;color:#555">하한선을 두지 않은 전체 목록입니다.
+<p style="font-size:.93rem;color:#555"><b>차 이름을 누르면 K카 매물 페이지가
+새 창으로 열립니다.</b> 하한선을 두지 않은 전체 목록이라
 안전장치나 장비가 적은 차도 들어 있으니 표의 숫자를 꼭 보세요.</p>
 {controls(3, fuels)}
 {cmp_table(all_sorted, 'tbl3', 'value')}

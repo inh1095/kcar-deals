@@ -195,6 +195,40 @@ def main() -> None:
         print(f"  {'OK  ' if p_ok else 'FAIL'} 탭 구성 '{need}' 존재")
     print(f"       참고: 가이드 내 표 {dict(gscan.rows)}")
 
+    # ── 매물 링크 검사 (클릭하면 실제 매물 페이지로 가는지) ────────────────
+    import re as _re
+    csv_ids = {r["id"] for r in rows}
+    linked = _re.findall(r'href="https://www\.kcar\.com/bc/detail/carInfoDtl\?i_sCarCd=([A-Z0-9]+)"',
+                         gbody)
+    uniq = set(linked)
+    link_checks = [
+        ("모든 매물에 링크가 있음", csv_ids <= uniq, f"누락 {len(csv_ids - uniq)}개"),
+        ("CSV에 없는 매물번호 링크 없음", uniq <= csv_ids, f"{len(uniq - csv_ids)}개"),
+        ("차명 자체가 링크(휴대폰에서 가로 스크롤 없이 누를 수 있음)",
+         len(_re.findall(r'<a class="cname"', gbody)) >= len(rows), "-"),
+        ("새 창으로 열림(target=_blank)",
+         not _re.findall(r'<a class="cname" href="[^"]+"(?![^>]*target="_blank")', gbody), "-"),
+        ("rel=noopener nofollow 적용",
+         len(_re.findall(r'class="cname"[^>]*rel="noopener nofollow"', gbody))
+         >= len(_re.findall(r'<a class="cname"', gbody)), "-"),
+        ("링크임을 알 수 있게 밑줄 표시",
+         "a.cname{" in gbody and "text-decoration:underline" in gbody, "-"),
+    ]
+    for label, passed, detail in link_checks:
+        ok &= bool(passed)
+        print(f"  {'OK  ' if passed else 'FAIL'} {label}: {detail}")
+    # 표별로 행 수와 링크 수가 같은지 (한 행이라도 링크가 빠지면 잡힌다)
+    for tid in ("tbl1", "tbl2", "tbl3"):
+        m = _re.search(r'id="' + tid + r'".*?</table>', gbody, _re.S)
+        if not m:
+            continue
+        body_t = m.group(0)
+        n_rows = len(_re.findall(r"<tr data-fuel=", body_t))
+        n_link = len(_re.findall(r"carInfoDtl\?i_sCarCd=", body_t))
+        same = n_rows * 2 == n_link      # 행마다 차명 링크 + '보기' 링크 = 2개
+        ok &= same
+        print(f"  {'OK  ' if same else 'FAIL'} {tid} 행 {n_rows}개 × 링크2 = {n_link}개")
+
     print()
     print("=" * 78)
     print("3) 시세 그룹 이상치")
