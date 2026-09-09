@@ -57,6 +57,12 @@ RARE = 15
 # 어머님이 직접 보내주신 매물(있으면 전용 칸에 따로 보여준다)
 MOTHER_PICK = "EC61399954"
 
+# 어머님께 보낼 추천 5대 — 풀옵션 4대 + 하이브리드 1대
+PICK_N_FULL = 4
+PICK_N_HYB = 1
+PICK_KM = 70000              # 추천 5대의 주행거리 상한 ("키로수 적은 걸로")
+PICK_GRADES = ("안심", "괜찮음")
+
 DISCLAIMER = ("개인이 참고용으로 만든 비공식 정리입니다. 가격과 매물 상태는 수시로 바뀌고 "
               "차는 팔리면 사라집니다. 실제 구매 결정은 반드시 매물 페이지와 현장에서 "
               "직접 확인하세요. 상업적 이용 금지.")
@@ -344,6 +350,27 @@ def pick_diverse(ranked, n=TOP_N):
     return out
 
 
+def pick_top5(main, hyb):
+    """어머님께 보낼 추천 5대.
+
+    풀옵션(장비 FULL_EQUIP+ · 안전 FULL_ADAS종) 중 PICK_KM 이하, 등급 안심·괜찮음,
+    건식 DCT 제외(시내 저속에서 울컥거릴 수 있어 시승 없이는 권하지 않는다),
+    차종별 1대, 10년 총지출 낮은 순으로 PICK_N_FULL대.
+    여기에 하이브리드 중 안전 FULL_ADAS종 전부 · PICK_KM 이하 · 같은 등급 조건에서
+    만족 요소가 가장 많은 PICK_N_HYB대를 더한다(이미 뽑힌 차종은 제외)."""
+    def base(i):
+        return (i["km"] or 0) <= PICK_KM and i["ev"]["grade"] in PICK_GRADES
+    full = [i for i in rank_full(main)
+            if base(i) and i["ev"]["pt"]["tx"] != K.TX_DCT_DRY]
+    picks = pick_diverse(full, PICK_N_FULL)
+    seen = {i["model_group"] or i["model"] for i in picks}
+    hy = [i for i in rank_satisfaction(hyb)
+          if base(i) and (i["adas_n"] or 0) >= FULL_ADAS
+          and (i["model_group"] or i["model"]) not in seen]
+    picks += pick_diverse(hy, PICK_N_HYB)
+    return picks
+
+
 # ── 공통 콘텐츠 ──────────────────────────────────────────────────────────────
 CHANNELS = [
     ("K카 (케이카) 직영", "https://www.kcar.com/bc/search",
@@ -521,6 +548,12 @@ border-radius:0 0 12px 12px;padding:20px}
 .card{background:#fff;border:1px solid #ddd9d1;border-radius:14px;padding:20px;margin:18px 0;
 box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .card.mom{border:2px solid #d9c47a;background:#fffdf3}
+.pick{background:#fff;border:1px solid #cfe3d7;border-left:6px solid #2f6f4f;border-radius:12px;
+ padding:14px 18px;margin:12px 0}
+.pick h3{margin:0 0 .3em;font-size:1.15rem;line-height:1.45}
+.pick h3 a.cname{color:#123f6e}
+.pick p{margin:.35em 0;font-size:.97rem}
+.pick .pspec{color:#333}
 .card h3{margin-top:0;font-size:1.2rem;line-height:1.4}
 .rank{display:inline-block;background:#2f6f4f;color:#fff;border-radius:999px;
 width:1.9em;height:1.9em;line-height:1.9em;text-align:center;font-size:.95rem;
@@ -568,7 +601,7 @@ table.simple td.num,table.simple th.num{text-align:right}
 table.simple .sub{font-size:.82rem;color:#666}
 table.simple tr.me{background:#fff6d9}
 .wrap{overflow-x:auto;background:#fff;border:1px solid #e0ddd6;border-radius:10px;margin:8px 0}
-table.cmp{border-collapse:collapse;width:100%;font-size:.86rem;min-width:820px}
+table.cmp{border-collapse:collapse;width:100%;font-size:.88rem;min-width:600px}
 table.cmp th,table.cmp td{padding:7px 8px;border-bottom:1px solid #eee;text-align:left;
 white-space:nowrap;vertical-align:middle}
 table.cmp th{background:#eef0ec;position:sticky;top:0;cursor:pointer;user-select:none;
@@ -681,10 +714,7 @@ def card(r: dict, rank, mode: str, mom: bool = False) -> str:
         f'<strong>{won(e["total_hold"])}만원</strong></div>'
         f'<div{hi_s}><span>만족 요소(체감장비+안전)</span>'
         f'<strong>{e["sat"]}/12가지</strong></div>')
-    if e["won_per_sat"]:
-        money += (f'<div><span>만족 요소 1가지당 지출</span>'
-                  f'<strong>{won(e["won_per_sat"])}만원</strong></div>')
-    pros = "".join(f"<li>{rich(g)}</li>" for g in e["good"][:9])
+    pros = "".join(f"<li>{rich(g)}</li>" for g in e["good"][:5])
     cons = "".join(f"<li>{rich(c)}</li>" for c in e["warn"] + e["caution"])
     checks = list(e["checks"])
     if r["fuel"] == "하이브리드":
@@ -721,34 +751,112 @@ rel="noopener nofollow">{h(r['maker'])} {h(r['model'])} {h(r['trim'])}</a>
 <details><summary>이 차를 보러 가면 꼭 확인할 것 ({len(checks)}가지)</summary>
 <div class="dbody"><ul class="chk">{checks_html}</ul></div></details>
 <p class="noprint"><a class="btn" href="{h(r['url'])}" target="_blank"
-rel="noopener nofollow">K카에서 이 차 보기</a>
-<span style="font-size:.85rem;color:#666">매물번호 {h(r['id'])}</span></p>
+rel="noopener nofollow">K카에서 이 차 보기</a></p>
 </div>"""
+
+
+# ── 추천 5대 ─────────────────────────────────────────────────────────────────
+def pick_why(i: dict) -> str:
+    e = i["ev"]
+    parts = [f"{i['year']}년식 {i['km'] / 10000:.1f}만km",
+             f"장비 {i['equip_n'] or 0}/{i['equip_total'] or 24}가지",
+             f"안전장치 {i['adas_n'] or 0}가지 전부" if (i["adas_n"] or 0) >= FULL_ADAS
+             else f"안전장치 {i['adas_n'] or 0}가지",
+             f"연 유지비 {won(e['running'])}만원"]
+    if i["fuel"] == "하이브리드":
+        parts.append("하이브리드라 기름값이 가장 적게 듭니다")
+    if i["accident"] == "무사고":
+        parts.append("무사고")
+    return " · ".join(parts)
+
+
+def pick_check(i: dict) -> str:
+    e = i["ev"]
+    cs = [c for c in e["caution"] if "시세" not in c][:2]
+    if not cs:
+        return "특별히 걸리는 점이 없습니다. 시승과 진단서 확인만 하시면 됩니다"
+    return " · ".join(cs)
+
+
+def pick_text(picks: list[dict], meta: dict) -> str:
+    """문자·카톡으로 붙여 보낼 수 있는 순수 텍스트."""
+    lines = [f"[어머님 추천 5대 — K카 직영, {meta.get('collected_at', '')} 기준]"]
+    for n, i in enumerate(picks, 1):
+        tag = " (하이브리드)" if i["fuel"] == "하이브리드" else ""
+        lines.append(f"{n}. {i['maker']} {i['model']} {i['trim']}{tag}")
+        lines.append(f"   {i['year_month']} · {i['km']:,}km · {i['price']:,}만원 · "
+                     f"{i['accident']} · 장비 {i['equip_n'] or 0}/{i['equip_total'] or 24}"
+                     f" · 안전 {i['adas_n'] or 0}/4")
+        lines.append(f"   {i['url']}")
+    lines.append("※ 가격·매물은 수시로 바뀝니다. 링크에서 직접 확인하세요. "
+                 "전체 목록: https://inh1095.github.io/kcar-deals/")
+    return "\n".join(lines)
+
+
+def pick5_html(picks: list[dict], meta: dict) -> str:
+    rows = []
+    for n, i in enumerate(picks, 1):
+        e = i["ev"]
+        cls, _g = GRADE_STYLE[e["grade"]]
+        hyb = ' <span class="badge" style="background:#e3f0ff;color:#1c4e80">하이브리드</span>' \
+            if i["fuel"] == "하이브리드" else ""
+        rows.append(f"""
+<div class="pick">
+<h3><span class="rank">{n}</span><a class="cname" href="{h(i['url'])}" target="_blank"
+rel="noopener nofollow">{h(i['maker'])} {h(i['model'])} {h(i['trim'])}</a>
+<span class="badge {cls}">{e['grade']}</span>{hyb}</h3>
+<p class="pspec"><b>{h(i['year_month'])}</b> · <b>{i['km']:,}km</b> ·
+<b>{i['price']:,}만원</b> · {h(i['accident'])} · {h(i['location'])}</p>
+<p><b>왜 이 차</b> — {h(pick_why(i))}. {rich(K.character_of(i['model']).split('. ')[0].rstrip('.'))}.</p>
+<p><b>가서 확인할 것</b> — {rich(pick_check(i))}</p>
+</div>""")
+    txt = pick_text(picks, meta)
+    return f"""
+<h2 id="pick5">어머님께 드리는 추천 5대</h2>
+<p class="lead">아래 {len(picks)}대만 보셔도 됩니다. <b>옵션과 안전장치를 다 갖춘 차 중에서
+{PICK_KM // 10000}만km 이하, 걸리는 점이 적은 차</b>를 차종마다 한 대씩 골랐고
+(총지출이 적은 순), 마지막 한 대는 <b>하이브리드 중 가장 나은 차</b>입니다.
+시내에서 울컥거릴 수 있는 건식 DCT 차(셀토스·K3 GT)는 시승 없이 권하기 어려워
+여기서는 뺐습니다 — 풀옵션 탭에서 보실 수 있습니다.</p>
+{''.join(rows)}
+<div class="box noprint" style="margin-top:14px">
+<p style="margin-top:0"><b>문자로 보내기</b> — 아래 내용을 복사해 붙여 넣으시면 됩니다.</p>
+<textarea id="pick5txt" readonly rows="{len(picks) * 3 + 2}"
+style="width:100%;font-size:.9rem;line-height:1.5;padding:10px;border:1px solid #ccc;
+border-radius:8px;font-family:inherit">{h(txt)}</textarea>
+<p style="margin-bottom:0"><button class="btn" type="button"
+onclick="var t=document.getElementById('pick5txt');t.select();
+(navigator.clipboard?navigator.clipboard.writeText(t.value):document.execCommand('copy'));
+this.textContent='복사됐습니다'">복사하기</button></p>
+</div>
+"""
 
 
 # ── 비교표 ───────────────────────────────────────────────────────────────────
 def cmp_table(items: list[dict], tid: str, key: str) -> str:
-    kv = " key" if key == "value" else ""
-    ks = " key" if key == "sat" else ""
+    """탭별 비교표. 열은 8개만 — 차·트림 / 연식 / 주행 / 차값 / 그 탭의 순위 기준 /
+    장비 / 안전 / 등급. 차 이름이 곧 링크다(별도 '보기' 열 없음)."""
+    if key == "sat":
+        key_th = "<th class='num key'>만족요소<br>(12중)</th>"
+    else:
+        key_th = f"<th class='num key'>{HOLD_YEARS}년 총지출<br>(만원)</th>"
     head = (f"<tr><th>차 · 트림</th><th>연식</th><th class='num'>주행(km)</th>"
-            f"<th class='num'>차값(만)</th><th class='num'>연 유지비<br>(만원)</th>"
-            f"<th class='num{kv}'>{HOLD_YEARS}년 총지출<br>(만원)</th>"
-            f"<th class='num{ks}'>만족요소<br>(12중)</th>"
-            f"<th class='num'>요소당<br>지출(만)</th><th class='num'>트림<br>등급</th>"
-            f"<th class='num'>장비<br>(24중)</th><th class='num'>안전<br>장치</th>"
-            f"<th>등급</th><th></th></tr>")
+            f"<th class='num'>차값(만)</th>{key_th}"
+            f"<th class='num'>장비<br>(24중)</th><th class='num'>안전<br>(4중)</th>"
+            f"<th>등급</th></tr>")
     body = []
     for i in items:
         e = i["ev"]
-        tr = (f'{i["trim_rank"]}/{i["trim_total"]}'
-              if i["trim_rank"] and i["trim_total"] and i["trim_total"] >= 2 else "-")
-        tr_top = (i["trim_rank"] and i["trim_total"] and i["trim_total"] >= 3
-                  and i["trim_rank"] <= max(2, i["trim_total"] // 3))
-        wps = won(e["won_per_sat"]) if e["won_per_sat"] else "-"
         me = ' class="me"' if i["id"] == MOTHER_PICK else ""
         tag = ' <span style="color:#8a6d1f">★어머님</span>' if i["id"] == MOTHER_PICK else ""
+        if key == "sat":
+            key_td = f'<td class="num" data-v="{e["sat"]}"><b>{e["sat"]}</b></td>'
+        else:
+            key_td = (f'<td class="num" data-v="{e["total_hold"]}">'
+                      f'<b>{won(e["total_hold"])}</b></td>')
+        adas = i["adas_n"] or 0
         body.append(
-            f'<tr{me} data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}" '
+            f'<tr{me} data-fuel="{h(i["fuel"])}" data-adas="{adas}" '
             f'data-km="{i["km"]}" data-equip="{i["equip_n"] or 0}">'
             f'<td><a class="cname" href="{h(i["url"])}" target="_blank" '
             f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a>{tag}<br>'
@@ -756,18 +864,11 @@ def cmp_table(items: list[dict], tid: str, key: str) -> str:
             f'<td data-v="{h(i["year_month"]).replace("-", "")}">{h(i["year_month"])}</td>'
             f'<td class="num" data-v="{i["km"]}">{i["km"]:,}</td>'
             f'<td class="num" data-v="{i["price"]}">{i["price"]:,}</td>'
-            f'<td class="num" data-v="{e["running"]}">{won(e["running"])}</td>'
-            f'<td class="num" data-v="{e["total_hold"]}"><b>{won(e["total_hold"])}</b></td>'
-            f'<td class="num" data-v="{e["sat"]}"><b>{e["sat"]}</b></td>'
-            f'<td class="num" data-v="{int(e["won_per_sat"] or 9e9)}">{wps}</td>'
-            f'<td class="num" data-v="{(i["trim_total"] or 0) - (i["trim_rank"] or 99)}">'
-            f'{"<b>" if tr_top else ""}{tr}{"</b>" if tr_top else ""}</td>'
+            f'{key_td}'
             f'<td class="num" data-v="{i["equip_n"] or 0}">{i["equip_n"] or 0}</td>'
-            f'<td class="num" data-v="{i["adas_n"] or 0}">'
-            f'{"<b>" if (i["adas_n"] or 0) >= 4 else ""}{i["adas_n"] or 0}'
-            f'{"</b>" if (i["adas_n"] or 0) >= 4 else ""}</td>'
+            f'<td class="num" data-v="{adas}">{"<b>" if adas >= 4 else ""}{adas}'
+            f'{"</b>" if adas >= 4 else ""}</td>'
             f'<td><span class="badge {GRADE_STYLE[e["grade"]][0]}">{e["grade"]}</span></td>'
-            f'<td><a href="{h(i["url"])}" target="_blank" rel="noopener nofollow">보기</a></td>'
             f'</tr>')
     return (f'<div class="wrap"><table class="cmp" id="{tid}"><thead>{head}</thead>'
             f'<tbody>{"".join(body)}</tbody></table></div>')
@@ -806,6 +907,7 @@ def build(rows, meta, stats) -> str:
             if (i["year"] or 0) >= MAIN_YEAR and (i["km"] or 0) <= MAIN_KM]
     hyb = [i for i in main if i["fuel"] == "하이브리드"]
     mom = next((i for i in items if i["id"] == MOTHER_PICK), None)
+    picks = pick_top5(main, hyb)
 
     tabs = [
         ("t1", "p1", 1, "풀옵션", "옵션·안전 다 갖춘 차", False,
@@ -996,8 +1098,8 @@ K카 직영 재고 전체에서 아이오닉(전기차 제외)은 <b>{mom['ev'][
 
 <h1>어머님을 위한 중고차 고르기</h1>
 <p class="lead">K카(kcar.com) 직영 재고를 <b>한 대도 빼지 않고 전부</b> 훑어
-조건에 맞는 <b>{len(items)}대</b>를 골랐습니다. 고르는 기준이 사람마다 다르니
-<b>다섯 개 탭</b>으로 나눠 두었습니다. 직접 눌러 비교해 보세요.</p>
+조건에 맞는 <b>{len(items)}대</b>를 골랐습니다. <b>바로 아래 추천 5대</b>부터 보시고,
+더 보고 싶으시면 기준별 <b>{len(tabs)}개 탭</b>을 눌러 비교해 보세요.</p>
 
 <div class="top">
 <p><b>수집 일시</b> {h(meta.get('collected_at'))} · <b>출처</b> K카(kcar.com) 직영 매물</p>
@@ -1012,11 +1114,15 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 <p style="font-size:.88rem">{h(DISCLAIMER)}</p>
 </div>
 
+{pick5_html(picks, meta)}
+
 {mom_html}
 
 <div class="box tipbox">
 <h3 style="margin-top:0">탭이 무엇이 다른가</h3>
 <table class="simple"><thead><tr><th>탭</th><th>보는 숫자</th><th>대상</th></tr></thead><tbody>
+<tr><td><b>풀옵션</b></td><td>장비 {FULL_EQUIP}가지 이상 + 안전장치 {FULL_ADAS}가지 전부<br>
+<span class="sub">그 안에서 총지출 적은 순</span></td><td>{MAIN_YEAR}년 이후 전체 연료</td></tr>
 <tr><td><b>가성비</b></td><td>{HOLD_YEARS}년 총지출 = 차값 + 유지비×{HOLD_YEARS}<br>
 <span class="sub">적은 순</span></td><td>{MAIN_YEAR}년 이후 전체 연료</td></tr>
 <tr><td><b>가심비</b></td><td>만족 요소 = 체감 장비 8 + 안전장치 4<br>
@@ -1026,9 +1132,9 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 <td>{HYBRID_YEAR}년 이후 하이브리드</td></tr>
 <tr><td><b>하이브리드 가심비</b></td><td>위와 같은 만족 요소 기준</td>
 <td>{HYBRID_YEAR}년 이후 하이브리드</td></tr>
-<tr><td><b>전체 비교</b></td><td>총지출 순 (하한선 없음)</td><td>전부 {len(items)}대</td></tr>
+<tr><td><b>전체 비교</b></td><td>총지출 순 (하한선 없음)</td><td>{MAIN_YEAR}년 이후 · {MAIN_KM:,}km 이하 전부 {len(main)}대</td></tr>
 </tbody></table>
-<p>네 개 순위 탭은 모두 <b>안전장치 {MIN_ADAS}가지 이상, 장비 {MIN_EQUIP}가지 이상,
+<p>다섯 개 순위 탭은 모두 <b>안전장치 {MIN_ADAS}가지 이상, 장비 {MIN_EQUIP}가지 이상,
 경고 없는 차</b>만 올립니다. 가심비 탭은 추가로 <b>연 유지비 {cap_man}만원 이하</b>
 (‘값도 적당’ 조건)입니다.</p>
 <p><b>감가는 어느 탭에서도 순위에 쓰지 않았습니다.</b> 끝까지 타실 계획이라면
@@ -1106,8 +1212,6 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 <p style="margin:.3em 0"><b>만족 요소</b> — 체감 장비 8가지(통풍시트·전동시트·무선충전·
 어라운드뷰·헤드업디스플레이·선루프·스마트크루즈·뒷좌석 열선) + 안전장치 4가지
 = 최대 12가지 중 몇 개인지입니다. 전 차량에 다 있는 항목은 구분이 안 되므로 세지 않았습니다.</p>
-<p style="margin:.3em 0"><b>요소당 지출</b> — {HOLD_YEARS}년 총지출 ÷ 만족 요소 개수.
-작을수록 같은 돈으로 더 많은 만족을 얻는다는 뜻입니다.</p>
 <p style="margin:.3em 0"><b>트림 등급</b> — <b>1/7</b>은 그 세대 7개 트림 중 가장 위
 등급이라는 뜻입니다. 숫자가 작을수록 좋은 트림입니다.</p>
 <p style="margin:.3em 0"><b>안전장치</b> — 자동긴급제동·차선이탈경보·후측방경보·
@@ -1231,7 +1335,8 @@ def main():
           f"풀옵션 {len(rank_full(main_i))} / 가성비 {len(rank_value(main_i))} / "
           f"가심비 {len(rank_satisfaction(main_i))} / "
           f"하이브리드 가성비 {len(rank_value(hyb_i))} / "
-          f"하이브리드 가심비 {len(rank_satisfaction(hyb_i))}")
+          f"하이브리드 가심비 {len(rank_satisfaction(hyb_i))} / "
+          f"추천 5대 {[i['id'] for i in pick_top5(main_i, hyb_i)]}")
 
 
 if __name__ == "__main__":

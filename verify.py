@@ -182,9 +182,10 @@ def main() -> None:
         print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
     # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
     # 탭 구성은 build_guide 의 상수에서 기대값을 가져온다(하드코딩하지 않는다).
-    from build_guide import (MAIN_YEAR, MAIN_KM, FULL_EQUIP, FULL_ADAS,
-                             load as _bg_load, evaluate as _bg_eval,
-                             rank_full, rank_value, rank_satisfaction, is_full_option)
+    from build_guide import (MAIN_YEAR, MAIN_KM, FULL_EQUIP, FULL_ADAS, PICK_KM,
+                             PICK_GRADES, load as _bg_load, evaluate as _bg_eval,
+                             rank_full, rank_value, rank_satisfaction, is_full_option,
+                             pick_top5)
     _rows, _meta, _stats = _bg_load(CSV_PATH)
     _items = [dict(r, ev=_bg_eval(dict(r), _stats)) for r in _rows]
     _main = [i for i in _items
@@ -223,6 +224,32 @@ def main() -> None:
         print(f"  {'OK  ' if full_ok else 'FAIL'} tbl1 풀옵션 하한: 장비 최소 "
               f"{min(eqs) if eqs else '-'}(>={FULL_EQUIP}) / 안전 최소 "
               f"{min(ads) if ads else '-'}(>={FULL_ADAS})")
+    # 추천 5대: build_guide.pick_top5 의 결과와 페이지의 #pick5 구역이 일치해야 한다
+    _picks = pick_top5(_main, _hyb)
+    m5 = _re0.search(r'<h2 id="pick5">.*?<h2', gbody, _re0.S)
+    if m5:
+        sec = m5.group(0)
+        ids5 = _re0.findall(r'carInfoDtl\?i_sCarCd=([A-Z0-9]+)', sec.split("<textarea", 1)[0])
+        exp5 = [i["id"] for i in _picks]
+        same5 = ids5 == exp5
+        ok &= same5
+        print(f"  {'OK  ' if same5 else 'DIFF'} 추천 5대 순서·구성: 페이지={ids5} / 기대={exp5}")
+        # 규칙이 실제로 지켜졌는지 (주행거리·등급·안전 4종·차종 중복 없음)
+        rule_ok = (len(_picks) == 5
+                   and all((i["km"] or 0) <= PICK_KM for i in _picks)
+                   and all(i["ev"]["grade"] in PICK_GRADES for i in _picks)
+                   and all((i["adas_n"] or 0) >= FULL_ADAS for i in _picks)
+                   and len({i["model_group"] or i["model"] for i in _picks}) == 5
+                   and sum(1 for i in _picks if i["fuel"] == "하이브리드") == 1)
+        ok &= rule_ok
+        print(f"  {'OK  ' if rule_ok else 'FAIL'} 추천 5대 규칙(5대 · {PICK_KM // 10000}만km 이하 · "
+              f"안심/괜찮음 · 안전 4종 · 차종 중복 없음 · 하이브리드 1대)")
+        txt_ok = 'id="pick5txt"' in sec and all(i["url"] in sec for i in _picks)
+        ok &= txt_ok
+        print(f"  {'OK  ' if txt_ok else 'FAIL'} 문자용 텍스트에 5대 링크 포함")
+    else:
+        ok = False
+        print("  FAIL 추천 5대 구역(#pick5) 없음")
     for need in ("풀옵션", "가성비", "가심비", "하이브리드 가성비", "하이브리드 가심비",
                  'id="t1"', 'id="t2"', 'id="t3"', 'id="t4"', 'id="t5"', 'id="t6"',
                  'class="panel"'):
@@ -263,9 +290,9 @@ def main() -> None:
         body_t = m.group(0)
         n_rows = len(_re.findall(r"<tr[^>]*data-fuel=", body_t))
         n_link = len(_re.findall(r"carInfoDtl\?i_sCarCd=", body_t))
-        same = n_rows * 2 == n_link      # 행마다 차명 링크 + '보기' 링크 = 2개
+        same = n_rows == n_link          # 행마다 차명 링크 1개('보기' 열은 없앴다)
         ok &= same
-        print(f"  {'OK  ' if same else 'FAIL'} {tid} 행 {n_rows}개 × 링크2 = {n_link}개")
+        print(f"  {'OK  ' if same else 'FAIL'} {tid} 행 {n_rows}개 = 링크 {n_link}개")
 
     print()
     print("=" * 78)
