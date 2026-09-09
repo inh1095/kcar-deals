@@ -87,6 +87,10 @@ ACCIDENT_OK = {"무사고", "단순수리"}
 # 참고 전장: 베뉴 4,040 / 스토닉 4,140 / 코나 4,165~4,350 / 니로 4,355 / 셀토스 4,375
 #          || 투싼 4,630 / 스포티지 4,660 / 쏘렌토 4,810 / 싼타페 4,785
 SMALL_SUV_ALLOW = {"스토닉", "코나", "베뉴", "셀토스", "니로"}
+# 준중형 SUV까지(기본): 쏘렌토(4,810mm)는 너무 크다는 사용자 판단 → 그 아래급인 투싼·스포티지까지 허용.
+COMPACT_SUV_ALLOW = SMALL_SUV_ALLOW | {"투싼", "스포티지"}
+SUV_ALLOW_BY_MAX = {"small": SMALL_SUV_ALLOW, "compact": COMPACT_SUV_ALLOW, "none": None}
+SUV_REJECT_LABEL = {"small": "SUV가 셀토스보다 큼", "compact": "SUV가 투싼·스포티지보다 큼"}
 OPTION_PATTERNS = {
     # 주차·후방 시야
     "후방카메라": ["카메라 : 후방"],
@@ -355,9 +359,10 @@ def reject_reason(item: dict, args) -> str | None:
         return "차종제외(경차/화물/승합)"
     if item["body_type"] == "미니밴":
         return "미니밴 제외"
-    if item["body_type"] == "SUV" and args.suv_limit \
-            and (item["model_group"] or "") not in SMALL_SUV_ALLOW:
-        return "SUV가 셀토스보다 큼"
+    suv_allow = SUV_ALLOW_BY_MAX[args.suv_max]
+    if item["body_type"] == "SUV" and suv_allow is not None \
+            and (item["model_group"] or "") not in suv_allow:
+        return SUV_REJECT_LABEL[args.suv_max]
     if item["seats"] != args.seats:
         return f"{args.seats}인승 아님"
     if item["fuel"] is None or item["fuel"] not in args.fuel_set:
@@ -574,9 +579,11 @@ def main() -> None:
     ap.add_argument("--year", type=int, default=2020, help="연식 하한")
     ap.add_argument("--km", type=int, default=100000, help="주행거리 상한")
     ap.add_argument("--seats", type=int, default=5, help="좌석 수 (기본 5인승)")
-    ap.add_argument("--no-suv-limit", dest="suv_limit", action="store_false",
-                    help="SUV 크기 상한(셀토스급)을 풀고 투싼·스포티지·싼타페까지 포함")
-    ap.set_defaults(suv_limit=True)
+    ap.add_argument("--suv-max", choices=("small", "compact", "none"), default="compact",
+                    help="SUV 크기 상한: small=셀토스급, compact=투싼·스포티지급(기본), "
+                         "none=제한 없음(싼타페·쏘렌토 포함)")
+    ap.add_argument("--no-suv-limit", dest="suv_max", action="store_const", const="none",
+                    help="(구 옵션) --suv-max none 과 같다")
     ap.add_argument("--fuel", default="gasoline,hybrid,lpg,diesel",
                     help="허용 연료 (gasoline,hybrid,lpg,diesel)")
     ap.add_argument("--out", default="data/listings.csv")

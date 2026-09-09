@@ -67,6 +67,7 @@ ENGINES = {
     "s2_30_dsl": dict(name="3.0 디젤", nature="디젤", theta2=False),
     "hev_kappa_16": dict(name="1.6 하이브리드", nature="하이브리드", theta2=False),
     "hev_nu_20": dict(name="2.0 하이브리드", nature="하이브리드", theta2=False),
+    "hev_gamma_16_t": dict(name="1.6 터보 하이브리드", nature="하이브리드", theta2=False),
 }
 
 # ── 차급 (승하차·주차 판단용) ────────────────────────────────────────────────
@@ -239,7 +240,7 @@ ANNUAL_KM = 12000
 # (엔진코드, 차급) 조합의 대표 복합연비 대략값(km/L). 정확한 공인연비가 아니라
 # 차종 간 연료비를 비교하기 위한 근사값이다.
 FUEL_ECONOMY = {
-    "hev_kappa_16": 19.0, "hev_nu_20": 17.0,
+    "hev_kappa_16": 19.0, "hev_nu_20": 17.0, "hev_gamma_16_t": 15.5,
     "u2_16_dsl": 16.0, "r_20_dsl": 13.5, "r_22_dsl": 11.5, "u_17_dsl": 15.0,
     "s2_30_dsl": 9.5,
     "kappa_14_mpi": 12.5, "kappa_10_t": 13.5,
@@ -358,8 +359,12 @@ def identify_powertrain(model: str, trim: str, fuel: str, cc: int | None,
     small = any(hint in m for hint in DCT_MODEL_HINTS)
 
     if fuel == "하이브리드":
-        if any(k in m for k in ("니로", "아이오닉")):
+        # 1.6 하이브리드(니로·아이오닉·코나)는 하이브리드 전용 6단 DCT. 2.0 하이브리드는 토크컨버터.
+        if any(k in m for k in ("니로", "아이오닉", "코나")):
             return dict(engine="hev_kappa_16", tx=TX_DCT_HEV)
+        # 투싼·스포티지 하이브리드는 1.6 터보 + 토크컨버터 6단 자동(건식 DCT 아님)
+        if any(k in m for k in ("투싼", "스포티지")):
+            return dict(engine="hev_gamma_16_t", tx=TX_AUTO)
         return dict(engine="hev_nu_20", tx=TX_AUTO)
 
     if fuel == "LPG":

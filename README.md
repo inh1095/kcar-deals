@@ -32,6 +32,7 @@ python3.11 build_report.py
 | `--year` | 연식 하한 (CSV 기준. 탭 표시 하한은 build_guide.MAIN_YEAR) | 2019 |
 | `--km` | 주행거리 상한 (CSV 기준. 탭 표시 상한은 build_guide.MAIN_KM) | 100000 |
 | `--seats` | 좌석 수 (5인승만 고르려면 5) | 5 |
+| `--suv-max` | SUV 크기 상한: `small`=셀토스급, `compact`=투싼·스포티지급, `none`=제한 없음 | compact |
 | `--fuel` | `gasoline,hybrid,lpg,diesel` 중 선택 | 전부 |
 | `--sleep` | 요청 간 대기(초) | 1.8 |
 
@@ -66,6 +67,8 @@ python3.11 build_report.py   # docs/report.md + docs/all.html (분석용)
 "차를 팔지 않고 끝까지 탄다" 가정 — 감가는 쓰지 않고 **10년 총지출(차값 + 세금·기름값×10)** 이 적은 순.
 대상은 K5 크기 이상(중형·준대형 세단) · 7만km 이하 · 경고 없음 · 흔한 차(재고 30+) · 건식 DCT 제외 ·
 장비 17+ · 안전장치 3+. 같은 차종+연료 조합은 한 번만.
+SUV 5대(`pick_top5_suv`)는 같은 기준으로 소형·준중형 SUV(투싼·스포티지급까지, 쏘렌토·싼타페는 너무 커서 제외)에서 뽑되,
+이 급 가솔린 터보가 대부분 건식 DCT라 제외하지 않고 '시승 필수'로 표시하며 같은 차종+엔진 조합을 한 번만 센다.
 
 ## 수집·비교 방식
 

@@ -183,8 +183,8 @@ def main() -> None:
     # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
     # 탭 구성은 build_guide 의 상수에서 기대값을 가져온다(하드코딩하지 않는다).
     from build_guide import (MAIN_YEAR, MAIN_KM, FULL_EQUIP, FULL_ADAS, PICK_KM,
-                             PICK_SIZES, PICK_N, PICK_MIN_EQUIP, PICK_MIN_ADAS,
-                             load as _bg_load, evaluate as _bg_eval,
+                             PICK_SIZES, PICK_SUV_SIZES, PICK_N, PICK_MIN_EQUIP, PICK_MIN_ADAS,
+                             load as _bg_load, evaluate as _bg_eval, pick_top5_suv,
                              rank_full, rank_value, rank_satisfaction, is_full_option,
                              pick_top5)
     _rows, _meta, _stats = _bg_load(CSV_PATH)
@@ -227,14 +227,32 @@ def main() -> None:
               f"{min(ads) if ads else '-'}(>={FULL_ADAS})")
     # 추천 5대: build_guide.pick_top5 의 결과와 페이지의 #pick5 구역이 일치해야 한다
     _picks = pick_top5(_main)
+    _suv = pick_top5_suv(_main)
     m5 = _re0.search(r'<h2 id="pick5">.*?<h2', gbody, _re0.S)
     if m5:
         sec = m5.group(0)
         ids5 = _re0.findall(r'carInfoDtl\?i_sCarCd=([A-Z0-9]+)', sec.split("<textarea", 1)[0])
-        exp5 = [i["id"] for i in _picks]
+        exp5 = [i["id"] for i in _picks] + [i["id"] for i in _suv]
         same5 = ids5 == exp5
         ok &= same5
-        print(f"  {'OK  ' if same5 else 'DIFF'} 추천 5대 순서·구성: 페이지={ids5} / 기대={exp5}")
+        print(f"  {'OK  ' if same5 else 'DIFF'} 추천 세단5+SUV5 순서·구성: 페이지={ids5} / 기대={exp5}")
+        suv_costs = [i["ev"]["total_hold"] for i in _suv]
+        suv_ok = (len(_suv) == PICK_N
+                  and all(i["ev"]["size"] in PICK_SUV_SIZES for i in _suv)
+                  and all((i["km"] or 0) <= PICK_KM for i in _suv)
+                  and all((i["equip_n"] or 0) >= PICK_MIN_EQUIP
+                          and (i["adas_n"] or 0) >= PICK_MIN_ADAS for i in _suv)
+                  and all(not i["ev"]["warn"] and i["ev"]["grade"] != "주의" for i in _suv)
+                  and len({(i["model"], i["ev"]["eng"]["name"]) for i in _suv}) == PICK_N
+                  and suv_costs == sorted(suv_costs))
+        ok &= suv_ok
+        print(f"  {'OK  ' if suv_ok else 'FAIL'} SUV 5대 규칙(준중형 SUV · {PICK_KM // 10000}만km · "
+              f"장비 {PICK_MIN_EQUIP}+·안전 {PICK_MIN_ADAS}+ · 경고 없음 · 세대+엔진 중복 없음 · "
+              f"총지출 오름차순): {[i['pick_label'] for i in _suv]}")
+        n_dct = sum(1 for i in _suv if i["ev"]["pt"]["tx"] == "건식 DCT")
+        dct_ok = sec.count("건식 DCT · 시승 필수") == n_dct
+        ok &= dct_ok
+        print(f"  {'OK  ' if dct_ok else 'FAIL'} SUV 건식 DCT 차 {n_dct}대에 '시승 필수' 표시")
         # 규칙이 실제로 지켜졌는지 (주행거리·등급·안전 4종·차종 중복 없음)
         labels = [i.get("pick_label") for i in _picks]
         costs = [i["ev"]["total_hold"] for i in _picks]
@@ -251,7 +269,7 @@ def main() -> None:
         print(f"  {'OK  ' if rule_ok else 'FAIL'} 추천 5대 규칙({PICK_N}대 · K5 크기 이상 · "
               f"{PICK_KM // 10000}만km 이하 · 장비 {PICK_MIN_EQUIP}+·안전 {PICK_MIN_ADAS}+ · "
               f"경고 없음 · 차종+연료 중복 없음 · 10년 총지출 오름차순): {labels}")
-        txt_ok = 'id="pick5txt"' in sec and all(i["url"] in sec for i in _picks)
+        txt_ok = 'id="pick5txt"' in sec and all(i["url"] in sec for i in _picks + _suv)
         ok &= txt_ok
         print(f"  {'OK  ' if txt_ok else 'FAIL'} 문자용 텍스트에 5대 링크 포함")
     else:
