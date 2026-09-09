@@ -33,7 +33,14 @@ ANNUAL_KM = K.ANNUAL_KM
 HOLD_YEARS = 10              # 오래 탈 기간 가정
 
 MAIN_YEAR = 2020             # 일반 탭 연식 하한
-HYBRID_YEAR = 2019           # 하이브리드 탭 연식 하한(물량이 적어 한 해 완화)
+HYBRID_YEAR = 2020           # 하이브리드 탭 연식 하한
+
+# '풀옵션' 기준. 장비 24가지 중 이 개수 이상 + 첨단 안전장치 4가지 전부.
+FULL_EQUIP = 20
+FULL_ADAS = 4
+
+# 탭에 올릴 주행거리 상한. CSV 는 이보다 넓게 받아 두고(어머님 매물 등 참고용) 여기서 좁힌다.
+MAIN_KM = 80000
 
 # 매일 체감하는 장비. 전 차량에 다 있는 항목(후방센서·열선시트 등)은 구분이 안 되므로 뺀다.
 PREMIUM_FEEL = ["통풍시트", "전동시트", "무선충전", "어라운드뷰",
@@ -313,6 +320,17 @@ def rank_satisfaction(items):
     return sorted(pool, key=lambda i: (-i["ev"]["sat"], i["ev"]["total_hold"]))
 
 
+def is_full_option(i: dict) -> bool:
+    """풀옵션 — 장비 20가지 이상이고 첨단 안전장치 4가지를 다 갖춘 차."""
+    return (i["equip_n"] or 0) >= FULL_EQUIP and (i["adas_n"] or 0) >= FULL_ADAS
+
+
+def rank_full(items):
+    """풀옵션만 모아 10년 총지출이 적은 순. 옵션은 이미 최상위라 값으로 줄인다."""
+    return sorted([i for i in items if eligible(i) and is_full_option(i)],
+                  key=lambda i: i["ev"]["total_hold"])
+
+
 def pick_diverse(ranked, n=TOP_N):
     out, seen = [], set()
     for i in ranked:
@@ -489,14 +507,16 @@ margin-bottom:-3px}
 .tabbar label.hyb{background:#e7f1ea;border-color:#a9cbb6;color:#1c5c38}
 #t1:checked~.tabbar label[for=t1],#t2:checked~.tabbar label[for=t2],
 #t3:checked~.tabbar label[for=t3],#t4:checked~.tabbar label[for=t4],
-#t5:checked~.tabbar label[for=t5]{background:#2f6f4f;color:#fff;border-color:#2f6f4f}
+#t5:checked~.tabbar label[for=t5],#t6:checked~.tabbar label[for=t6]{background:#2f6f4f;
+color:#fff;border-color:#2f6f4f}
 #t1:checked~.tabbar label[for=t1] small,#t2:checked~.tabbar label[for=t2] small,
 #t3:checked~.tabbar label[for=t3] small,#t4:checked~.tabbar label[for=t4] small,
-#t5:checked~.tabbar label[for=t5] small{color:#d7ecdd}
+#t5:checked~.tabbar label[for=t5] small,#t6:checked~.tabbar label[for=t6] small
+{color:#d7ecdd}
 .panel{display:none;background:#fff;border:2px solid #2f6f4f;border-top:none;
 border-radius:0 0 12px 12px;padding:20px}
 #t1:checked~.panels>#p1,#t2:checked~.panels>#p2,#t3:checked~.panels>#p3,
-#t4:checked~.panels>#p4,#t5:checked~.panels>#p5{display:block}
+#t4:checked~.panels>#p4,#t5:checked~.panels>#p5,#t6:checked~.panels>#p6{display:block}
 
 .card{background:#fff;border:1px solid #ddd9d1;border-radius:14px;padding:20px;margin:18px 0;
 box-shadow:0 1px 3px rgba(0,0,0,.05)}
@@ -600,24 +620,30 @@ document.querySelectorAll('table.cmp').forEach(function(t){
 });
 function wire(n){
   var q=document.getElementById('q'+n),ff=document.getElementById('f'+n),
-      fa=document.getElementById('a'+n),cnt=document.getElementById('c'+n),
+      fa=document.getElementById('a'+n),fk=document.getElementById('k'+n),
+      fe=document.getElementById('e'+n),cnt=document.getElementById('c'+n),
       tbl='#tbl'+n+' tbody tr';
   if(!q)return;
   function flt(){
     var sv=(q.value||'').trim().toLowerCase(),fv=ff?ff.value:'',
-        av=fa?parseInt(fa.value||'0',10):0,k=0;
+        av=fa?parseInt(fa.value||'0',10):0,
+        kv=fk?parseInt(fk.value||'0',10):0,
+        ev=fe?parseInt(fe.value||'0',10):0,k=0;
     document.querySelectorAll(tbl).forEach(function(tr){
       var ok=(!sv||tr.textContent.toLowerCase().indexOf(sv)>=0)
           && (!fv||tr.dataset.fuel===fv)
-          && (!av||parseInt(tr.dataset.adas||'0',10)>=av);
+          && (!av||parseInt(tr.dataset.adas||'0',10)>=av)
+          && (!kv||parseInt(tr.dataset.km||'0',10)<=kv)
+          && (!ev||parseInt(tr.dataset.equip||'0',10)>=ev);
       tr.style.display=ok?'':'none'; if(ok)k++;
     });
     cnt.textContent=k+'대 표시 중';
   }
-  [q,ff,fa].forEach(function(e){if(e)e.addEventListener('input',flt)});
+  [q,ff,fa,fk,fe].forEach(function(e){if(e)e.addEventListener('input',flt)});
+  [q,ff,fa,fk,fe].forEach(function(e){if(e)e.addEventListener('change',flt)});
   flt();
 }
-[1,2,3,4,5].forEach(wire);
+[1,2,3,4,5,6].forEach(wire);
 """
 
 
@@ -722,7 +748,8 @@ def cmp_table(items: list[dict], tid: str, key: str) -> str:
         me = ' class="me"' if i["id"] == MOTHER_PICK else ""
         tag = ' <span style="color:#8a6d1f">★어머님</span>' if i["id"] == MOTHER_PICK else ""
         body.append(
-            f'<tr{me} data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}">'
+            f'<tr{me} data-fuel="{h(i["fuel"])}" data-adas="{i["adas_n"] or 0}" '
+            f'data-km="{i["km"]}" data-equip="{i["equip_n"] or 0}">'
             f'<td><a class="cname" href="{h(i["url"])}" target="_blank" '
             f'rel="noopener nofollow"><b>{h(i["maker"])} {h(i["model"])}</b></a>{tag}<br>'
             f'<span class="sub">{h(i["trim"])}</span></td>'
@@ -752,11 +779,18 @@ def controls(n: int, fuels: list[str] | None) -> str:
         opts = "".join(f'<option value="{h(f)}">{h(f)}</option>' for f in fuels)
         fuel_sel = f'<select id="f{n}"><option value="">연료 전체</option>{opts}</select>'
     return (f'<div class="ctl noprint">'
-            f'<input id="q{n}" type="search" placeholder="차명·트림 검색 (예: 니로, 시그니처)">'
+            f'<input id="q{n}" type="search" placeholder="차명·트림 검색 (예: 그랜저, 시그니처)">'
             f'{fuel_sel}'
             f'<select id="a{n}"><option value="">안전장치 전체</option>'
             f'<option value="4">4가지 전부</option><option value="3">3가지 이상</option>'
             f'<option value="2">2가지 이상</option></select>'
+            f'<select id="k{n}"><option value="">주행거리 전체</option>'
+            f'<option value="40000">4만km 이하</option><option value="50000">5만km 이하</option>'
+            f'<option value="60000">6만km 이하</option><option value="70000">7만km 이하</option>'
+            f'</select>'
+            f'<select id="e{n}"><option value="">장비 전체</option>'
+            f'<option value="22">22가지 이상</option><option value="20">20가지 이상</option>'
+            f'<option value="18">18가지 이상</option></select>'
             f'<span id="c{n}" style="align-self:center;font-size:.9rem;color:#555"></span>'
             f'</div>')
 
@@ -768,38 +802,45 @@ def build(rows, meta, stats) -> str:
         r["ev"] = evaluate(r, stats)
         items.append(r)
 
-    main = [i for i in items if (i["year"] or 0) >= MAIN_YEAR]
-    hyb = [i for i in items if i["fuel"] == "하이브리드"
-           and (i["year"] or 0) >= HYBRID_YEAR]
+    main = [i for i in items
+            if (i["year"] or 0) >= MAIN_YEAR and (i["km"] or 0) <= MAIN_KM]
+    hyb = [i for i in main if i["fuel"] == "하이브리드"]
     mom = next((i for i in items if i["id"] == MOTHER_PICK), None)
 
     tabs = [
-        ("t1", "p1", 1, "가성비", "돈이 가장 덜 나가는 차", False,
+        ("t1", "p1", 1, "풀옵션", "옵션·안전 다 갖춘 차", False,
+         "value", rank_full(main),
+         f"장비를 <b>{FULL_EQUIP}가지 이상</b>({{}}가지 중) 갖추고 <b>첨단 안전장치 "
+         f"{FULL_ADAS}가지를 전부</b> 가진 차만 모았습니다. 어머님이 선호하시는 "
+         f"'풀옵션'에 가장 가까운 목록입니다. 옵션은 이미 최상위라 그 안에서 "
+         f"<b>{HOLD_YEARS}년 총지출이 적은 순</b>으로 줄였습니다.".format(24),
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 · 장비 {FULL_EQUIP}+ · 안전 {FULL_ADAS}종"),
+        ("t2", "p2", 2, "가성비", "돈이 가장 덜 나가는 차", False,
          "value", rank_value(main),
          f"차값이 싼 차가 아니라 <b>차값 + 유지비를 {HOLD_YEARS}년 합쳐서</b> 가장 적게 "
          f"나가는 차입니다. 차값이 300만원 싸도 유지비가 매년 50만원 더 들면 "
          f"{HOLD_YEARS}년이면 오히려 200만원 손해입니다.",
-         f"{MAIN_YEAR}년 이후 전체 연료"),
-        ("t2", "p2", 2, "가심비", "만족을 사는 차", False,
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 · 전체 연료"),
+        ("t3", "p3", 3, "가심비", "만족을 사는 차", False,
          "sat", rank_satisfaction(main),
          "매일 손에 닿는 장비와 안전장치가 가장 많은 차입니다. 만족 요소가 같다면 "
          "총지출이 적은 차를 앞에 뒀습니다.",
-         f"{MAIN_YEAR}년 이후 전체 연료"),
-        ("t3", "p3", 3, "하이브리드 가성비", "하이브리드 중 돈이 덜 드는 차", True,
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 · 전체 연료"),
+        ("t4", "p4", 4, "하이브리드 가성비", "하이브리드 중 돈이 덜 드는 차", True,
          "value", rank_value(hyb),
          "하이브리드만 모아 <b>같은 가성비 기준</b>으로 줄였습니다. 하이브리드는 원래 "
          "기름값이 적게 들어 유지비 항목에서 크게 유리합니다.",
-         f"{HYBRID_YEAR}년 이후 하이브리드만"),
-        ("t4", "p4", 4, "하이브리드 가심비", "하이브리드 중 만족이 큰 차", True,
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 · 하이브리드만"),
+        ("t5", "p5", 5, "하이브리드 가심비", "하이브리드 중 만족이 큰 차", True,
          "sat", rank_satisfaction(hyb),
          "하이브리드만 모아 <b>같은 가심비 기준</b>으로 줄였습니다. 조용함과 낮은 기름값에 "
          "장비까지 갖춘 차입니다.",
-         f"{HYBRID_YEAR}년 이후 하이브리드만"),
-        ("t5", "p5", 5, "전체 비교", "조건 통과 전부", False,
-         "value", sorted(items, key=lambda i: i["ev"]["total_hold"]),
-         "하한선을 두지 않은 전체 목록입니다. 안전장치나 장비가 적은 차도 들어 있으니 "
-         "표의 숫자를 꼭 보세요.",
-         f"{HYBRID_YEAR}년 이후 전부"),
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 · 하이브리드만"),
+        ("t6", "p6", 6, "전체 비교", "조건 통과 전부", False,
+         "value", sorted(main, key=lambda i: i["ev"]["total_hold"]),
+         "하한선을 두지 않은 전체 목록입니다. 위 필터로 주행거리·장비·안전장치를 "
+         "직접 좁혀 보실 수 있습니다.",
+         f"{MAIN_YEAR}년+ · {MAIN_KM//10000}만km 이하 전부"),
     ]
 
     radios = "".join(f'<input type="radio" name="tab" id="{t[0]}"'
@@ -817,10 +858,11 @@ def build(rows, meta, stats) -> str:
         note = ""
         if is_hyb:
             note = (f'<div class="box tipbox" style="margin-top:0"><p style="margin:0">'
-                    f'<b>하이브리드는 물량이 적어 연식 하한을 {HYBRID_YEAR}년으로 한 해 '
-                    f'낮췄습니다.</b> ({MAIN_YEAR}년 이후만 보면 하이브리드가 '
-                    f'{sum(1 for i in hyb if (i["year"] or 0) >= MAIN_YEAR)}대뿐입니다.) '
-                    f'어머님이 보내주신 아이오닉도 2019년식이라 이 탭에 들어 있습니다.'
+                    f'<b>이 조건에서 하이브리드는 {len(hyb)}대입니다.</b> '
+                    f'풀옵션(장비 {FULL_EQUIP}가지+·안전 {FULL_ADAS}종) 조건까지 만족하는 '
+                    f'하이브리드는 그중 '
+                    f'{sum(1 for i in hyb if is_full_option(i))}대뿐입니다 — '
+                    f'하이브리드와 풀옵션은 이 예산에서 거의 겹치지 않습니다.'
                     f'</p></div>')
         mom_here = (mom is not None and mom in ranked)
         mom_note = ""
@@ -869,6 +911,13 @@ def build(rows, meta, stats) -> str:
         mom_html = f"""
 <h2>어머님이 보내주신 매물</h2>
 <div class="mombox">
+<p style="margin-top:0;color:#8a5a12"><b>먼저 알려드릴 것</b> — 이 차는
+<b>{mom['year']}년식 · {mom['km']:,}km</b>라서 새로 좁힌 조건
+(<b>{MAIN_YEAR}년 이후 · {MAIN_KM:,}km 이하</b>)을 <b>두 가지 모두 넘습니다.</b>
+그래서 아래 탭 목록에는 없고 이 칸에서만 보실 수 있습니다.
+(수집 시점 기준 <b>아직 판매 중</b>입니다.)
+조건을 올리면 더 새롭고 덜 달린 차를 볼 수 있지만,
+<b>같은 예산에서는 트림이 낮아지는 절충이 생깁니다</b>(아래 표 참고).</p>
 <p style="margin-top:0"><b>결론부터</b> — 하이브리드로는 <b>좋은 선택</b>입니다.
 연 유지비가 {won(mom['ev']['running'])}만원으로 이 목록에서 가장 낮은 수준이고
 무사고입니다. 다만 <b>확인하고 가셔야 할 것이 두 가지</b> 있습니다.</p>
@@ -956,10 +1005,10 @@ K카 직영 재고 전체에서 아이오닉(전기차 제외)은 <b>{mom['ev'][
 시세 기준으로 쓰고, 조건에 맞는 <b>{len(items)}대</b>를 골랐습니다.
 그중 <b>하이브리드는 {len(hyb)}대</b>입니다.</p>
 <p>조건: <b>5인승 · 현대·기아(제네시스 포함) · 차량가 {c.get('budget', 2200):,}만원 이하 ·
-{c.get('km', 100000):,}km 이하 · 무사고 또는 단순수리</b>.
+{MAIN_KM:,}km 이하 · 무사고 또는 단순수리</b>.
 SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제외), 미니밴·카니발·경차·화물·
-승합·렌터카는 제외했습니다. 연식은 일반 탭 <b>{MAIN_YEAR}년 이후</b>,
-하이브리드 탭은 물량이 적어 <b>{HYBRID_YEAR}년 이후</b>입니다.</p>
+승합·렌터카는 제외했습니다. <b>연식 {MAIN_YEAR}년 이후</b>이며, 하이브리드 탭도 같은 조건입니다.
+표 위 필터로 주행거리(4~7만km)와 장비 개수를 더 좁혀 보실 수 있습니다.</p>
 <p style="font-size:.88rem">{h(DISCLAIMER)}</p>
 </div>
 
@@ -1000,6 +1049,46 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 {radios}
 <div class="tabbar">{labels}</div>
 <div class="panels">{''.join(panels)}</div>
+</div>
+
+<h2>"최근 연식이면 옵션이 많다"가 이 예산에서는 반대입니다</h2>
+<p class="lead">최신 연식일수록 최신 시스템이 많다는 건 <b>신차 기준</b>으로는 맞습니다.
+그런데 <b>예산을 {c.get('budget', 2500):,}만원으로 고정</b>하면 이야기가 뒤집힙니다.
+직영 재고에서 실제로 계산한 결과입니다.</p>
+<div class="box warnbox">
+<table class="simple"><thead><tr><th>연식</th><th class="num">대수</th>
+<th class="num">장비 중앙값</th><th class="num">안전 4종 비율</th>
+<th class="num">차값 중앙값</th></tr></thead><tbody>
+<tr><td>2019년</td><td class="num">186</td><td class="num">18.0/24</td>
+<td class="num">41%</td><td class="num">1,590만</td></tr>
+<tr><td><b>2020년</b></td><td class="num">142</td>
+<td class="num"><b style="color:#1c5c38">19.0/24</b></td>
+<td class="num"><b style="color:#1c5c38">48%</b></td><td class="num">1,855만</td></tr>
+<tr><td>2021년</td><td class="num">146</td><td class="num">18.0/24</td>
+<td class="num">47%</td><td class="num">1,965만</td></tr>
+<tr><td>2022년</td><td class="num">124</td><td class="num">18.0/24</td>
+<td class="num">45%</td><td class="num">2,050만</td></tr>
+<tr><td>2023년</td><td class="num">42</td>
+<td class="num"><b style="color:#932018">15.0/24</b></td>
+<td class="num">35%</td><td class="num">2,125만</td></tr>
+<tr><td>2025년</td><td class="num">4</td>
+<td class="num"><b style="color:#932018">12.5/24</b></td>
+<td class="num"><b style="color:#932018">0%</b></td><td class="num">2,385만</td></tr>
+</tbody></table>
+<p><b>왜 이런가</b> — 예산이 정해져 있으면 <b>연식이 최신일수록 하위 트림(이른바 '깡통')만
+살 수 있습니다.</b> 2025년식 2,385만원짜리는 신차 가격대의 최하 트림이고,
+2020년식 1,855만원이면 같은 돈으로 <b>상위 트림</b>을 살 수 있습니다.</p>
+<p><b>그래서 '최신 시스템·풀옵션'을 원하시면 연식보다 트림을 보셔야 합니다.</b>
+어머님이 원하시는 것에 가장 가까운 건 <b>맨 앞의 '풀옵션' 탭</b>입니다
+(장비 {FULL_EQUIP}가지 이상 + 안전장치 {FULL_ADAS}가지 전부).</p>
+</div>
+<div class="box tipbox">
+<p style="margin-top:0"><b>한 가지 더 — 풀옵션과 하이브리드는 거의 겹치지 않습니다.</b>
+이 예산에서 풀옵션 조건을 만족하는 차는 대부분 중대형 세단(그랜저·K5·K8)이고,
+하이브리드는 대체로 중·하위 트림입니다. 둘 중 무엇을 앞에 둘지 정하셔야 합니다.</p>
+<p><b>하이브리드를 우선하시면</b> 조용함과 낮은 기름값을 얻고 옵션은 조금 양보하게 됩니다.
+<b>풀옵션을 우선하시면</b> 옵션은 다 갖추지만 기름값이 더 듭니다.
+두 탭을 나란히 눌러 보시고 결정하세요.</p>
 </div>
 
 <h2>하이브리드를 보실 때 꼭 확인할 것</h2>
@@ -1135,10 +1224,12 @@ def main():
     with open(args.out, "w", encoding="utf-8") as fh:
         fh.write(build(rows, meta, stats))
     items = [dict(r, ev=evaluate(dict(r), stats)) for r in rows]
-    main_i = [i for i in items if (i["year"] or 0) >= MAIN_YEAR]
-    hyb_i = [i for i in items if i["fuel"] == "하이브리드" and (i["year"] or 0) >= HYBRID_YEAR]
-    print(f"{args.out} 생성 — 전체 {len(rows)}대 / "
-          f"가성비 {len(rank_value(main_i))} / 가심비 {len(rank_satisfaction(main_i))} / "
+    main_i = [i for i in items
+              if (i["year"] or 0) >= MAIN_YEAR and (i["km"] or 0) <= MAIN_KM]
+    hyb_i = [i for i in main_i if i["fuel"] == "하이브리드"]
+    print(f"{args.out} 생성 — CSV {len(rows)}대 / 탭 대상({MAIN_YEAR}년+·{MAIN_KM//10000}만km) {len(main_i)}대 / "
+          f"풀옵션 {len(rank_full(main_i))} / 가성비 {len(rank_value(main_i))} / "
+          f"가심비 {len(rank_satisfaction(main_i))} / "
           f"하이브리드 가성비 {len(rank_value(hyb_i))} / "
           f"하이브리드 가심비 {len(rank_satisfaction(hyb_i))}")
 

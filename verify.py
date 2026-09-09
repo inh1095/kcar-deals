@@ -181,25 +181,51 @@ def main() -> None:
         ok &= passed
         print(f"  {'OK  ' if passed else 'FAIL'} {tag} 존재")
     # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
-    t5 = gscan.rows.get("tbl5", -1)      # 전체 비교 탭
-    passed = t5 == len(rows)
-    ok &= passed
-    print(f"  {'OK  ' if passed else 'DIFF'} 전체 탭 표(tbl5) 행 수: 가이드={t5} / CSV={len(rows)}")
-    for tid in ("tbl1", "tbl2", "tbl3", "tbl4"):
-        n = gscan.rows.get(tid, -1)
-        sub_ok = 0 < n <= len(rows)
-        ok &= sub_ok
-        print(f"  {'OK  ' if sub_ok else 'FAIL'} {tid} 행 수 {n} (0 < n <= {len(rows)})")
-    # 하이브리드 탭(tbl3/tbl4)은 하이브리드만 들어 있어야 한다
-    for tid in ("tbl3", "tbl4"):
+    # 탭 구성은 build_guide 의 상수에서 기대값을 가져온다(하드코딩하지 않는다).
+    from build_guide import (MAIN_YEAR, MAIN_KM, FULL_EQUIP, FULL_ADAS,
+                             load as _bg_load, evaluate as _bg_eval,
+                             rank_full, rank_value, rank_satisfaction, is_full_option)
+    _rows, _meta, _stats = _bg_load(CSV_PATH)
+    _items = [dict(r, ev=_bg_eval(dict(r), _stats)) for r in _rows]
+    _main = [i for i in _items
+             if (i["year"] or 0) >= MAIN_YEAR and (i["km"] or 0) <= MAIN_KM]
+    _hyb = [i for i in _main if i["fuel"] == "하이브리드"]
+    expect = {
+        "tbl1": len(rank_full(_main)),
+        "tbl2": len(rank_value(_main)),
+        "tbl3": len(rank_satisfaction(_main)),
+        "tbl4": len(rank_value(_hyb)),
+        "tbl5": len(rank_satisfaction(_hyb)),
+        "tbl6": len(_main),
+    }
+    print(f"       탭 대상: {MAIN_YEAR}년+ · {MAIN_KM:,}km 이하 = {len(_main)}대 "
+          f"(CSV 전체 {len(_rows)}대)")
+    for tid, exp in expect.items():
+        got = gscan.rows.get(tid, -1)
+        same = got == exp
+        ok &= same
+        print(f"  {'OK  ' if same else 'DIFF'} {tid} 행 수: 가이드={got} / 기대={exp}")
+    # 하이브리드 탭(tbl4·tbl5)에는 하이브리드만 있어야 한다
+    for tid in ("tbl4", "tbl5"):
         m = _re0.search(r'id="' + tid + r'".*?</table>', gbody, _re0.S)
         if m:
             fuels = set(_re0.findall(r'data-fuel="([^"]*)"', m.group(0)))
             hyb_only = fuels <= {"하이브리드"}
             ok &= hyb_only
             print(f"  {'OK  ' if hyb_only else 'FAIL'} {tid} 하이브리드만 포함: {fuels}")
-    for need in ("가성비", "가심비", "하이브리드 가성비", "하이브리드 가심비",
-                 'id="t1"', 'id="t2"', 'id="t3"', 'id="t4"', 'id="t5"', 'class="panel"'):
+    # 풀옵션 탭(tbl1)은 장비·안전 하한을 만족해야 한다
+    m = _re0.search(r'id="tbl1".*?</table>', gbody, _re0.S)
+    if m:
+        eqs = [int(x) for x in _re0.findall(r'data-equip="(\d+)"', m.group(0))]
+        ads = [int(x) for x in _re0.findall(r'data-adas="(\d+)"', m.group(0))]
+        full_ok = eqs and min(eqs) >= FULL_EQUIP and ads and min(ads) >= FULL_ADAS
+        ok &= bool(full_ok)
+        print(f"  {'OK  ' if full_ok else 'FAIL'} tbl1 풀옵션 하한: 장비 최소 "
+              f"{min(eqs) if eqs else '-'}(>={FULL_EQUIP}) / 안전 최소 "
+              f"{min(ads) if ads else '-'}(>={FULL_ADAS})")
+    for need in ("풀옵션", "가성비", "가심비", "하이브리드 가성비", "하이브리드 가심비",
+                 'id="t1"', 'id="t2"', 'id="t3"', 'id="t4"', 'id="t5"', 'id="t6"',
+                 'class="panel"'):
         p_ok = need in gbody
         ok &= p_ok
         print(f"  {'OK  ' if p_ok else 'FAIL'} 탭 구성 '{need}' 존재")
@@ -207,15 +233,17 @@ def main() -> None:
 
     # ── 매물 링크 검사 (클릭하면 실제 매물 페이지로 가는지) ────────────────
     import re as _re
-    csv_ids = {r["id"] for r in rows}
+    csv_ids = {i["id"] for i in _main}   # 탭에 실리는 차만 링크 대상
     linked = _re.findall(r'href="https://www\.kcar\.com/bc/detail/carInfoDtl\?i_sCarCd=([A-Z0-9]+)"',
                          gbody)
     uniq = set(linked)
     link_checks = [
         ("모든 매물에 링크가 있음", csv_ids <= uniq, f"누락 {len(csv_ids - uniq)}개"),
-        ("CSV에 없는 매물번호 링크 없음", uniq <= csv_ids, f"{len(uniq - csv_ids)}개"),
+        # 어머님 매물처럼 조건 밖이지만 전용 칸에 실린 차가 있을 수 있다.
+        ("모든 링크가 CSV 안의 매물", uniq <= {r["id"] for r in rows},
+         f"{len(uniq - {r['id'] for r in rows})}개"),
         ("차명 자체가 링크(휴대폰에서 가로 스크롤 없이 누를 수 있음)",
-         len(_re.findall(r'<a class="cname"', gbody)) >= len(rows), "-"),
+         len(_re.findall(r'<a class="cname"', gbody)) >= len(csv_ids), "-"),
         ("새 창으로 열림(target=_blank)",
          not _re.findall(r'<a class="cname" href="[^"]+"(?![^>]*target="_blank")', gbody), "-"),
         ("rel=noopener nofollow 적용",
@@ -228,7 +256,7 @@ def main() -> None:
         ok &= bool(passed)
         print(f"  {'OK  ' if passed else 'FAIL'} {label}: {detail}")
     # 표별로 행 수와 링크 수가 같은지 (한 행이라도 링크가 빠지면 잡힌다)
-    for tid in ("tbl1", "tbl2", "tbl3", "tbl4", "tbl5"):
+    for tid in ("tbl1", "tbl2", "tbl3", "tbl4", "tbl5", "tbl6"):
         m = _re.search(r'id="' + tid + r'".*?</table>', gbody, _re.S)
         if not m:
             continue
