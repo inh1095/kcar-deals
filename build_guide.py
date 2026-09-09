@@ -57,13 +57,17 @@ RARE = 15
 # 어머님이 직접 보내주신 매물(있으면 전용 칸에 따로 보여준다)
 MOTHER_PICK = "EC61399954"
 
-# 어머님께 보낼 추천 5대 — 어머님이 타시던 K5 크기 이상(중형 세단 이상)만.
-# 자리: 가성비 1위 · 가심비 1위 · 하이브리드 가심비 2대 · 풀옵션 가성비 1위
+# 어머님께 보낼 추천 5대 — "차를 팔지 않고 끝까지 탄다" 가정.
+# 감가(중고 시세)는 보지 않고 구입가 + 10년 유지비(= 10년 총지출)로만 줄인다.
+# 대상: K5 크기 이상(중형·준대형 세단) · PICK_KM 이하 · 경고 없음(eligible) ·
+#       부품·정비가 쉬운 흔한 차(재고 COMMON_OK+) · 건식 DCT 제외 ·
+#       옵션이 어느 정도 있는 차(장비 PICK_MIN_EQUIP+ · 안전장치 PICK_MIN_ADAS+).
+#       같은 차종+연료 조합은 1대만.
 PICK_SIZES = (K.SIZE_MID_SEDAN, K.SIZE_LARGE_SEDAN)
-PICK_N_HYB = 2
-PICK_KM = 70000              # 추천 5대의 주행거리 상한 ("키로수 적은 걸로")
-PICK_GRADES = ("안심", "괜찮음")   # 풀옵션 자리에만 적용
-PICK_HYB_MIN_ADAS = 3        # 하이브리드 자리는 안전장치 3가지 이상
+PICK_KM = 70000              # 주행거리 상한 ("키로수 적은 걸로")
+PICK_MIN_EQUIP = 17
+PICK_MIN_ADAS = 3
+PICK_N = 5
 
 DISCLAIMER = ("개인이 참고용으로 만든 비공식 정리입니다. 가격과 매물 상태는 수시로 바뀌고 "
               "차는 팔리면 사라집니다. 실제 구매 결정은 반드시 매물 페이지와 현장에서 "
@@ -353,45 +357,31 @@ def pick_diverse(ranked, n=TOP_N):
 
 
 def pick_pool(main):
-    """추천 5대의 대상 — K5 크기 이상(PICK_SIZES) · PICK_KM 이하."""
+    """추천 5대의 대상 — 끝까지 탈 차의 조건.
+    K5 크기 이상 · PICK_KM 이하 · 경고 없음 · 흔한 차(재고 COMMON_OK+) · 건식 DCT 제외 ·
+    장비 PICK_MIN_EQUIP+ · 안전장치 PICK_MIN_ADAS+."""
     return [i for i in main
-            if i["ev"]["size"] in PICK_SIZES and (i["km"] or 0) <= PICK_KM]
+            if i["ev"]["size"] in PICK_SIZES and (i["km"] or 0) <= PICK_KM
+            and eligible(i) and i["ev"]["stock"] >= COMMON_OK
+            and i["ev"]["pt"]["tx"] != K.TX_DCT_DRY
+            and (i["equip_n"] or 0) >= PICK_MIN_EQUIP
+            and (i["adas_n"] or 0) >= PICK_MIN_ADAS]
 
 
 def pick_top5(main):
-    """어머님께 보낼 추천 5대. 각 차에 'pick_label'(어느 자리로 뽑혔는지)을 붙여 돌려준다.
-
-    대상은 pick_pool(): 어머님이 타시던 K5 크기 이상(중형 세단·준대형 이상 세단), PICK_KM 이하.
-      1. 가성비 1위        — rank_value 1위 (10년 총지출 최소)
-      2. 가심비 1위        — rank_satisfaction 1위 (만족 요소 최다)
-      3~4. 하이브리드 가심비 — 하이브리드 중 만족 요소 순 PICK_N_HYB대 (안전장치 PICK_HYB_MIN_ADAS+)
-      5. 풀옵션 가성비 1위  — 장비 FULL_EQUIP+ · 안전 FULL_ADAS종, 건식 DCT 제외, 등급 PICK_GRADES
-    같은 차종+연료 조합은 한 번만 뽑는다(쏘나타 가솔린과 쏘나타 하이브리드는 다른 차로 본다)."""
-    pool = pick_pool(main)
-    hy = [i for i in pool if i["fuel"] == "하이브리드"]
-    picks: list[dict] = []
-    seen: set = set()
-
-    def key(i):
-        return (i["model_group"] or i["model"], i["fuel"])
-
-    def take(label, ranked, n=1, cond=None):
-        got = 0
-        for i in ranked:
-            if key(i) in seen or (cond and not cond(i)):
-                continue
-            seen.add(key(i))
-            picks.append(dict(i, pick_label=label))
-            got += 1
-            if got >= n:
-                break
-
-    take("가성비 1위", rank_value(pool))
-    take("가심비 1위", rank_satisfaction(pool))
-    take("하이브리드 가심비", rank_satisfaction(hy), PICK_N_HYB,
-         lambda i: (i["adas_n"] or 0) >= PICK_HYB_MIN_ADAS)
-    take("풀옵션 가성비 1위", rank_full(pool), 1,
-         lambda i: i["ev"]["pt"]["tx"] != K.TX_DCT_DRY and i["ev"]["grade"] in PICK_GRADES)
+    """어머님께 보낼 추천 5대 — pick_pool() 안에서 10년 총지출(차값 + 세금·기름값×10)이
+    적은 순. 같은 차종+연료 조합은 1대만(쏘나타 가솔린과 쏘나타 하이브리드는 다른 차).
+    각 차에 'pick_label'(총지출 순위)을 붙여 돌려준다. 감가는 쓰지 않는다."""
+    ranked = sorted(pick_pool(main), key=lambda i: i["ev"]["total_hold"])
+    picks, seen = [], set()
+    for i in ranked:
+        key = (i["model_group"] or i["model"], i["fuel"])
+        if key in seen:
+            continue
+        seen.add(key)
+        picks.append(dict(i, pick_label=f"10년 총지출 {len(picks) + 1}위"))
+        if len(picks) >= PICK_N:
+            break
     return picks
 
 
@@ -806,13 +796,14 @@ def pick_check(i: dict) -> str:
 
 def pick_text(picks: list[dict], meta: dict) -> str:
     """문자·카톡으로 붙여 보낼 수 있는 순수 텍스트."""
-    lines = [f"[어머님 추천 5대 — K카 직영, {meta.get('collected_at', '')} 기준]"]
+    lines = [f"[어머님 추천 5대 — 안 팔고 끝까지 타기 기준(차값+10년 유지비) · "
+             f"K카 직영, {meta.get('collected_at', '')} 기준]"]
     for n, i in enumerate(picks, 1):
         tag = " (하이브리드)" if i["fuel"] == "하이브리드" else ""
         lines.append(f"{n}. [{i.get('pick_label', '')}] {i['maker']} {i['model']} {i['trim']}{tag}")
         lines.append(f"   {i['year_month']} · {i['km']:,}km · {i['price']:,}만원 · "
                      f"{i['accident']} · 장비 {i['equip_n'] or 0}/{i['equip_total'] or 24}"
-                     f" · 안전 {i['adas_n'] or 0}/4")
+                     f" · 안전 {i['adas_n'] or 0}/4 · 10년 총지출 {won(i['ev']['total_hold'])}만")
         lines.append(f"   {i['url']}")
     lines.append("※ 가격·매물은 수시로 바뀝니다. 링크에서 직접 확인하세요. "
                  "전체 목록: https://inh1095.github.io/kcar-deals/")
@@ -822,8 +813,6 @@ def pick_text(picks: list[dict], meta: dict) -> str:
 def pick5_html(picks: list[dict], meta: dict, main: list[dict]) -> str:
     pool = pick_pool(main)
     n_hy = sum(1 for i in pool if i["fuel"] == "하이브리드")
-    n_hy_ok = sum(1 for i in pool if i["fuel"] == "하이브리드"
-                  and (i["adas_n"] or 0) >= PICK_HYB_MIN_ADAS and eligible(i))
     rows = []
     for n, i in enumerate(picks, 1):
         e = i["ev"]
@@ -844,16 +833,15 @@ rel="noopener nofollow">{h(i['maker'])} {h(i['model'])} {h(i['trim'])}</a>
     txt = pick_text(picks, meta)
     return f"""
 <h2 id="pick5">어머님께 드리는 추천 5대</h2>
-<p class="lead">어머님이 타시던 <b>K5 크기 이상(중형·준대형 세단)</b>, <b>{PICK_KM // 10000}만km 이하</b>
-{len(pool)}대만 놓고 다섯 자리를 정해 뽑았습니다.
-<b>가성비 1위</b>(10년 동안 돈이 가장 덜 드는 차) · <b>가심비 1위</b>(장비·안전장치가 가장 많은 차) ·
-<b>하이브리드 {PICK_N_HYB}대</b>(하이브리드 중 만족 요소가 많은 순) ·
-<b>풀옵션 1위</b>(옵션·안전을 다 갖춘 차 중 돈이 가장 덜 드는 차).
-아반떼·니로·셀토스 같은 준중형·소형은 K5보다 작아 뺐습니다.</p>
-<p style="font-size:.95rem;color:#555">참고 — 이 예산에서 K5 크기 이상 하이브리드는 {n_hy}대인데
-대부분 기본 트림이고, 안전장치 {PICK_HYB_MIN_ADAS}가지 이상에 걸리는 점이 없는 차는
-{n_hy_ok}대뿐입니다. 하이브리드는 조용하고 기름값이 적게 드는 대신 <b>같은 값이면 옵션이
-적다</b>는 점을 두 대를 나란히 보시며 정하시면 됩니다.</p>
+<p class="lead">차를 <b>팔지 않고 끝까지 탄다</b>고 보고 뽑았습니다. 그러면 중고 시세(감가)는
+통장에서 나가는 돈이 아니므로 보지 않고, <b>차값 + 10년치 세금·기름값</b>이 적은 순서로만
+줄였습니다.</p>
+<p style="font-size:.95rem;color:#555">대상은 어머님이 타시던 <b>K5 크기 이상(중형·준대형 세단)</b>,
+<b>{PICK_KM // 10000}만km 이하</b>, 옵션이 어느 정도 있는 차(장비 {PICK_MIN_EQUIP}가지 이상 ·
+안전장치 {PICK_MIN_ADAS}가지 이상), 걸리는 점이 없는 차, 부품·정비가 쉬운 흔한 차(직영 재고
+{COMMON_OK}대 이상), 시내에서 울컥거릴 수 있는 건식 DCT 제외 — 모두 {len(pool)}대(그중 하이브리드
+{n_hy}대)이고, 같은 차종·연료는 한 대씩만 올렸습니다. 아반떼·니로·셀토스 같은 준중형·소형은
+K5보다 작아 뺐습니다. 순위 숫자를 눌러 보실 필요 없이 <b>위에서부터 돈이 덜 드는 순서</b>입니다.</p>
 {''.join(rows)}
 <div class="box noprint" style="margin-top:14px">
 <p style="margin-top:0"><b>문자로 보내기</b> — 아래 내용을 복사해 붙여 넣으시면 됩니다.</p>

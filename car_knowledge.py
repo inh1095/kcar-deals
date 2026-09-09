@@ -23,6 +23,8 @@
 """
 from __future__ import annotations
 
+import re as _re
+
 # ── 변속기 분류 (기어 단수는 단정하지 않는다. 판단에 필요한 구분만 한다) ──────
 TX_AUTO = "일반 자동변속기"
 TX_DCT_DRY = "건식 DCT"
@@ -51,6 +53,7 @@ ENGINES = {
     "nu_20": dict(name="2.0 자연흡기 가솔린", nature="자연흡기", theta2=False),
     "smartstream_25": dict(name="2.5 가솔린", nature="자연흡기", theta2=False),
     "smartstream_20_t": dict(name="2.0 터보 가솔린", nature="터보", theta2=False),
+    "smartstream_25_t": dict(name="2.5 터보 가솔린", nature="터보", theta2=False),
     "lambda_35": dict(name="3.5 가솔린", nature="자연흡기", theta2=False),
     "lambda_33_t": dict(name="3.3 터보 가솔린", nature="터보", theta2=False),
     "nu_20_lpi": dict(name="2.0 LPG", nature="자연흡기", theta2=False),
@@ -245,7 +248,7 @@ FUEL_ECONOMY = {
     "nu_20": 11.8, "nu_20_lpi": 8.8,
     "theta2_24_gdi": 10.8, "theta2_20_t": 10.5, "lambda_30_33": 9.5,
     # 2020년 이후 스마트스트림·람다 계열 (신형 후보에서 쓰인다)
-    "smartstream_25": 11.0, "smartstream_20_t": 10.5,
+    "smartstream_25": 11.0, "smartstream_20_t": 10.5, "smartstream_25_t": 10.2,
     "lambda_35": 9.2, "lambda_33_t": 8.5,
 }
 
@@ -322,6 +325,8 @@ def _gasoline_turbo_engine(cc: int | None) -> str:
         return "gamma_16_t"
     if cc <= 2150:
         return "smartstream_20_t"
+    if cc <= 2700:
+        return "smartstream_25_t"
     return "lambda_33_t"
 
 
@@ -347,7 +352,9 @@ def identify_powertrain(model: str, trim: str, fuel: str, cc: int | None,
     """
     t = f"{model} {trim}"
     m = model
-    turbo = ("터보" in t) or ("T-GDI" in t) or ("TGDI" in t)
+    # "2.0T"·"3.3T"·"1.6 T"처럼 숫자 뒤 T만 붙는 표기(G70·쏘울 부스터·K9)도 터보다.
+    turbo = (("터보" in t) or ("T-GDI" in t) or ("TGDI" in t)
+             or bool(_re.search(r"\d\.\d\s*T(?![A-Za-z가-힣])", t)))
     small = any(hint in m for hint in DCT_MODEL_HINTS)
 
     if fuel == "하이브리드":

@@ -183,7 +183,8 @@ def main() -> None:
     # 탭별 비교표: tbl3(전체)는 CSV 전체와 같아야 하고, tbl1/tbl2 는 하한을 통과한 부분집합
     # 탭 구성은 build_guide 의 상수에서 기대값을 가져온다(하드코딩하지 않는다).
     from build_guide import (MAIN_YEAR, MAIN_KM, FULL_EQUIP, FULL_ADAS, PICK_KM,
-                             PICK_SIZES, PICK_N_HYB, load as _bg_load, evaluate as _bg_eval,
+                             PICK_SIZES, PICK_N, PICK_MIN_EQUIP, PICK_MIN_ADAS,
+                             load as _bg_load, evaluate as _bg_eval,
                              rank_full, rank_value, rank_satisfaction, is_full_option,
                              pick_top5)
     _rows, _meta, _stats = _bg_load(CSV_PATH)
@@ -236,17 +237,20 @@ def main() -> None:
         print(f"  {'OK  ' if same5 else 'DIFF'} 추천 5대 순서·구성: 페이지={ids5} / 기대={exp5}")
         # 규칙이 실제로 지켜졌는지 (주행거리·등급·안전 4종·차종 중복 없음)
         labels = [i.get("pick_label") for i in _picks]
-        rule_ok = (len(_picks) == 5
+        costs = [i["ev"]["total_hold"] for i in _picks]
+        rule_ok = (len(_picks) == PICK_N
                    and all((i["km"] or 0) <= PICK_KM for i in _picks)
                    and all(i["ev"]["size"] in PICK_SIZES for i in _picks)
-                   and len({(i["model_group"] or i["model"], i["fuel"]) for i in _picks}) == 5
-                   and sum(1 for i in _picks if i["fuel"] == "하이브리드") >= PICK_N_HYB
-                   and labels[:2] == ["가성비 1위", "가심비 1위"]
+                   and all((i["equip_n"] or 0) >= PICK_MIN_EQUIP
+                           and (i["adas_n"] or 0) >= PICK_MIN_ADAS for i in _picks)
+                   and all(not i["ev"]["warn"] and i["ev"]["grade"] != "주의" for i in _picks)
+                   and len({(i["model_group"] or i["model"], i["fuel"]) for i in _picks}) == PICK_N
+                   and costs == sorted(costs)          # 총지출 오름차순(감가 미사용)
                    and all(l for l in labels))
         ok &= rule_ok
-        print(f"  {'OK  ' if rule_ok else 'FAIL'} 추천 5대 규칙(5대 · K5 크기 이상 · "
-              f"{PICK_KM // 10000}만km 이하 · 차종+연료 중복 없음 · 하이브리드 {PICK_N_HYB}대 이상): "
-              f"{labels}")
+        print(f"  {'OK  ' if rule_ok else 'FAIL'} 추천 5대 규칙({PICK_N}대 · K5 크기 이상 · "
+              f"{PICK_KM // 10000}만km 이하 · 장비 {PICK_MIN_EQUIP}+·안전 {PICK_MIN_ADAS}+ · "
+              f"경고 없음 · 차종+연료 중복 없음 · 10년 총지출 오름차순): {labels}")
         txt_ok = 'id="pick5txt"' in sec and all(i["url"] in sec for i in _picks)
         ok &= txt_ok
         print(f"  {'OK  ' if txt_ok else 'FAIL'} 문자용 텍스트에 5대 링크 포함")
