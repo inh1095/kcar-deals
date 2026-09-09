@@ -57,11 +57,13 @@ RARE = 15
 # 어머님이 직접 보내주신 매물(있으면 전용 칸에 따로 보여준다)
 MOTHER_PICK = "EC61399954"
 
-# 어머님께 보낼 추천 5대 — 풀옵션 4대 + 하이브리드 1대
-PICK_N_FULL = 4
-PICK_N_HYB = 1
+# 어머님께 보낼 추천 5대 — 어머님이 타시던 K5 크기 이상(중형 세단 이상)만.
+# 자리: 가성비 1위 · 가심비 1위 · 하이브리드 가심비 2대 · 풀옵션 가성비 1위
+PICK_SIZES = (K.SIZE_MID_SEDAN, K.SIZE_LARGE_SEDAN)
+PICK_N_HYB = 2
 PICK_KM = 70000              # 추천 5대의 주행거리 상한 ("키로수 적은 걸로")
-PICK_GRADES = ("안심", "괜찮음")
+PICK_GRADES = ("안심", "괜찮음")   # 풀옵션 자리에만 적용
+PICK_HYB_MIN_ADAS = 3        # 하이브리드 자리는 안전장치 3가지 이상
 
 DISCLAIMER = ("개인이 참고용으로 만든 비공식 정리입니다. 가격과 매물 상태는 수시로 바뀌고 "
               "차는 팔리면 사라집니다. 실제 구매 결정은 반드시 매물 페이지와 현장에서 "
@@ -350,24 +352,46 @@ def pick_diverse(ranked, n=TOP_N):
     return out
 
 
-def pick_top5(main, hyb):
-    """어머님께 보낼 추천 5대.
+def pick_pool(main):
+    """추천 5대의 대상 — K5 크기 이상(PICK_SIZES) · PICK_KM 이하."""
+    return [i for i in main
+            if i["ev"]["size"] in PICK_SIZES and (i["km"] or 0) <= PICK_KM]
 
-    풀옵션(장비 FULL_EQUIP+ · 안전 FULL_ADAS종) 중 PICK_KM 이하, 등급 안심·괜찮음,
-    건식 DCT 제외(시내 저속에서 울컥거릴 수 있어 시승 없이는 권하지 않는다),
-    차종별 1대, 10년 총지출 낮은 순으로 PICK_N_FULL대.
-    여기에 하이브리드 중 안전 FULL_ADAS종 전부 · PICK_KM 이하 · 같은 등급 조건에서
-    만족 요소가 가장 많은 PICK_N_HYB대를 더한다(이미 뽑힌 차종은 제외)."""
-    def base(i):
-        return (i["km"] or 0) <= PICK_KM and i["ev"]["grade"] in PICK_GRADES
-    full = [i for i in rank_full(main)
-            if base(i) and i["ev"]["pt"]["tx"] != K.TX_DCT_DRY]
-    picks = pick_diverse(full, PICK_N_FULL)
-    seen = {i["model_group"] or i["model"] for i in picks}
-    hy = [i for i in rank_satisfaction(hyb)
-          if base(i) and (i["adas_n"] or 0) >= FULL_ADAS
-          and (i["model_group"] or i["model"]) not in seen]
-    picks += pick_diverse(hy, PICK_N_HYB)
+
+def pick_top5(main):
+    """어머님께 보낼 추천 5대. 각 차에 'pick_label'(어느 자리로 뽑혔는지)을 붙여 돌려준다.
+
+    대상은 pick_pool(): 어머님이 타시던 K5 크기 이상(중형 세단·준대형 이상 세단), PICK_KM 이하.
+      1. 가성비 1위        — rank_value 1위 (10년 총지출 최소)
+      2. 가심비 1위        — rank_satisfaction 1위 (만족 요소 최다)
+      3~4. 하이브리드 가심비 — 하이브리드 중 만족 요소 순 PICK_N_HYB대 (안전장치 PICK_HYB_MIN_ADAS+)
+      5. 풀옵션 가성비 1위  — 장비 FULL_EQUIP+ · 안전 FULL_ADAS종, 건식 DCT 제외, 등급 PICK_GRADES
+    같은 차종+연료 조합은 한 번만 뽑는다(쏘나타 가솔린과 쏘나타 하이브리드는 다른 차로 본다)."""
+    pool = pick_pool(main)
+    hy = [i for i in pool if i["fuel"] == "하이브리드"]
+    picks: list[dict] = []
+    seen: set = set()
+
+    def key(i):
+        return (i["model_group"] or i["model"], i["fuel"])
+
+    def take(label, ranked, n=1, cond=None):
+        got = 0
+        for i in ranked:
+            if key(i) in seen or (cond and not cond(i)):
+                continue
+            seen.add(key(i))
+            picks.append(dict(i, pick_label=label))
+            got += 1
+            if got >= n:
+                break
+
+    take("가성비 1위", rank_value(pool))
+    take("가심비 1위", rank_satisfaction(pool))
+    take("하이브리드 가심비", rank_satisfaction(hy), PICK_N_HYB,
+         lambda i: (i["adas_n"] or 0) >= PICK_HYB_MIN_ADAS)
+    take("풀옵션 가성비 1위", rank_full(pool), 1,
+         lambda i: i["ev"]["pt"]["tx"] != K.TX_DCT_DRY and i["ev"]["grade"] in PICK_GRADES)
     return picks
 
 
@@ -554,6 +578,8 @@ box-shadow:0 1px 3px rgba(0,0,0,.05)}
 .pick h3 a.cname{color:#123f6e}
 .pick p{margin:.35em 0;font-size:.97rem}
 .pick .pspec{color:#333}
+.plabel{display:inline-block;background:#2f6f4f;color:#fff;border-radius:6px;padding:2px 9px;
+ font-size:.8rem;margin-right:6px;vertical-align:middle;white-space:nowrap}
 .card h3{margin-top:0;font-size:1.2rem;line-height:1.4}
 .rank{display:inline-block;background:#2f6f4f;color:#fff;border-radius:999px;
 width:1.9em;height:1.9em;line-height:1.9em;text-align:center;font-size:.95rem;
@@ -783,7 +809,7 @@ def pick_text(picks: list[dict], meta: dict) -> str:
     lines = [f"[어머님 추천 5대 — K카 직영, {meta.get('collected_at', '')} 기준]"]
     for n, i in enumerate(picks, 1):
         tag = " (하이브리드)" if i["fuel"] == "하이브리드" else ""
-        lines.append(f"{n}. {i['maker']} {i['model']} {i['trim']}{tag}")
+        lines.append(f"{n}. [{i.get('pick_label', '')}] {i['maker']} {i['model']} {i['trim']}{tag}")
         lines.append(f"   {i['year_month']} · {i['km']:,}km · {i['price']:,}만원 · "
                      f"{i['accident']} · 장비 {i['equip_n'] or 0}/{i['equip_total'] or 24}"
                      f" · 안전 {i['adas_n'] or 0}/4")
@@ -793,7 +819,11 @@ def pick_text(picks: list[dict], meta: dict) -> str:
     return "\n".join(lines)
 
 
-def pick5_html(picks: list[dict], meta: dict) -> str:
+def pick5_html(picks: list[dict], meta: dict, main: list[dict]) -> str:
+    pool = pick_pool(main)
+    n_hy = sum(1 for i in pool if i["fuel"] == "하이브리드")
+    n_hy_ok = sum(1 for i in pool if i["fuel"] == "하이브리드"
+                  and (i["adas_n"] or 0) >= PICK_HYB_MIN_ADAS and eligible(i))
     rows = []
     for n, i in enumerate(picks, 1):
         e = i["ev"]
@@ -802,7 +832,8 @@ def pick5_html(picks: list[dict], meta: dict) -> str:
             if i["fuel"] == "하이브리드" else ""
         rows.append(f"""
 <div class="pick">
-<h3><span class="rank">{n}</span><a class="cname" href="{h(i['url'])}" target="_blank"
+<h3><span class="rank">{n}</span><span class="plabel">{h(i.get('pick_label', ''))}</span>
+<a class="cname" href="{h(i['url'])}" target="_blank"
 rel="noopener nofollow">{h(i['maker'])} {h(i['model'])} {h(i['trim'])}</a>
 <span class="badge {cls}">{e['grade']}</span>{hyb}</h3>
 <p class="pspec"><b>{h(i['year_month'])}</b> · <b>{i['km']:,}km</b> ·
@@ -813,11 +844,16 @@ rel="noopener nofollow">{h(i['maker'])} {h(i['model'])} {h(i['trim'])}</a>
     txt = pick_text(picks, meta)
     return f"""
 <h2 id="pick5">어머님께 드리는 추천 5대</h2>
-<p class="lead">아래 {len(picks)}대만 보셔도 됩니다. <b>옵션과 안전장치를 다 갖춘 차 중에서
-{PICK_KM // 10000}만km 이하, 걸리는 점이 적은 차</b>를 차종마다 한 대씩 골랐고
-(총지출이 적은 순), 마지막 한 대는 <b>하이브리드 중 가장 나은 차</b>입니다.
-시내에서 울컥거릴 수 있는 건식 DCT 차(셀토스·K3 GT)는 시승 없이 권하기 어려워
-여기서는 뺐습니다 — 풀옵션 탭에서 보실 수 있습니다.</p>
+<p class="lead">어머님이 타시던 <b>K5 크기 이상(중형·준대형 세단)</b>, <b>{PICK_KM // 10000}만km 이하</b>
+{len(pool)}대만 놓고 다섯 자리를 정해 뽑았습니다.
+<b>가성비 1위</b>(10년 동안 돈이 가장 덜 드는 차) · <b>가심비 1위</b>(장비·안전장치가 가장 많은 차) ·
+<b>하이브리드 {PICK_N_HYB}대</b>(하이브리드 중 만족 요소가 많은 순) ·
+<b>풀옵션 1위</b>(옵션·안전을 다 갖춘 차 중 돈이 가장 덜 드는 차).
+아반떼·니로·셀토스 같은 준중형·소형은 K5보다 작아 뺐습니다.</p>
+<p style="font-size:.95rem;color:#555">참고 — 이 예산에서 K5 크기 이상 하이브리드는 {n_hy}대인데
+대부분 기본 트림이고, 안전장치 {PICK_HYB_MIN_ADAS}가지 이상에 걸리는 점이 없는 차는
+{n_hy_ok}대뿐입니다. 하이브리드는 조용하고 기름값이 적게 드는 대신 <b>같은 값이면 옵션이
+적다</b>는 점을 두 대를 나란히 보시며 정하시면 됩니다.</p>
 {''.join(rows)}
 <div class="box noprint" style="margin-top:14px">
 <p style="margin-top:0"><b>문자로 보내기</b> — 아래 내용을 복사해 붙여 넣으시면 됩니다.</p>
@@ -907,7 +943,7 @@ def build(rows, meta, stats) -> str:
             if (i["year"] or 0) >= MAIN_YEAR and (i["km"] or 0) <= MAIN_KM]
     hyb = [i for i in main if i["fuel"] == "하이브리드"]
     mom = next((i for i in items if i["id"] == MOTHER_PICK), None)
-    picks = pick_top5(main, hyb)
+    picks = pick_top5(main)
 
     tabs = [
         ("t1", "p1", 1, "풀옵션", "옵션·안전 다 갖춘 차", False,
@@ -1114,7 +1150,7 @@ SUV는 셀토스 크기까지만(투싼·스포티지·싼타페·쏘렌토 제�
 <p style="font-size:.88rem">{h(DISCLAIMER)}</p>
 </div>
 
-{pick5_html(picks, meta)}
+{pick5_html(picks, meta, main)}
 
 {mom_html}
 
@@ -1336,7 +1372,7 @@ def main():
           f"가심비 {len(rank_satisfaction(main_i))} / "
           f"하이브리드 가성비 {len(rank_value(hyb_i))} / "
           f"하이브리드 가심비 {len(rank_satisfaction(hyb_i))} / "
-          f"추천 5대 {[i['id'] for i in pick_top5(main_i, hyb_i)]}")
+          f"추천 5대 {[(i['pick_label'], i['id']) for i in pick_top5(main_i)]}")
 
 
 if __name__ == "__main__":
